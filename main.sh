@@ -173,18 +173,18 @@ create_container () {
             echo "  - job_name: node" >> $file_name
             echo "    # If prometheus-node-exporter is installed, grab stats about the local" >> $file_name
             echo "    # machine by default." >> $file_name
-        echo "    static_configs:" >> $file_name
+            echo "    static_configs:" >> $file_name
             echo "      - targets: ['$host_ip:9100']" >> $file_name
             echo "" >> $file_name
             echo "  - job_name: 'jenkins'" >> $file_name
             echo "    static_configs:" >> $file_name
             echo "      - targets: ['10.128.151.10:8080']" >> $file_name
             echo "    metrics_path: '/prometheus/'" >> $file_name
-            ;;
+        ;;
 
 
         "tolgee")
-        update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
+            update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
             sleep 10
 
             echo "Creating database..."
