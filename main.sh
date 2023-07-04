@@ -1,4 +1,4 @@
-#!/bin/bash
+*#!/bin/bash
 # checks if the user is root
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
@@ -23,7 +23,7 @@ vps_setup_single () {
     newgrp lxd
     sudo -i
 
-    # Do not create a bridge by default
+    # Ne pas créer de bridge par défaut
     lxd init
     exit
 
@@ -52,8 +52,8 @@ vps_setup_single () {
     sudo systemctl enable docker.service
     sudo systemctl enable containerd.service
 
-    touch /home/$SUDO_USER/.setup
-    echo "done" >> /home/$SUDO_USER/.setup
+    sudo docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.41.0
+    
 }
 
 update_install_packages () {
@@ -153,84 +153,84 @@ create_container () {
     echo "Installing required packages..."
 
     case $container_name in
-	"jenkins")
-	    update_install_packages $container_name openjdk-11-jdk
+        "jenkins")
+            update_install_packages $container_name openjdk-11-jdk
 
-    	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
-	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null"
-    	lxc-attach $container_name -- apt update -y && apt install jenkins -y
-	    lxc-attach $container_name -- systemctl start jenkins && sudo systemctl enable jenkins
-    	;;
-
-
-	"prometheus")
-	    update_install_packages $container_name prometheus
-	    file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
-	    host_ip=$(ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//')
-
-	    # Add the content to the file
-	    echo "" >> $file_name
-	    echo "  - job_name: node" >> $file_name
-	    echo "    # If prometheus-node-exporter is installed, grab stats about the local" >> $file_name
-	    echo "    # machine by default." >> $file_name
-    	echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$host_ip:9100']" >> $file_name
-	    echo "" >> $file_name
-	    echo "  - job_name: 'jenkins'" >> $file_name
-	    echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['10.128.151.10:8080']" >> $file_name
-	    echo "    metrics_path: '/prometheus/'" >> $file_name
-	    ;;
+        lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
+            lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null"
+        lxc-attach $container_name -- apt update -y && apt install jenkins -y
+            lxc-attach $container_name -- systemctl start jenkins && sudo systemctl enable jenkins
+        ;;
 
 
-	"tolgee")
+        "prometheus")
+            update_install_packages $container_name prometheus
+            file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
+            host_ip=$(ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//')
+
+            # Add the content to the file
+            echo "" >> $file_name
+            echo "  - job_name: node" >> $file_name
+            echo "    # If prometheus-node-exporter is installed, grab stats about the local" >> $file_name
+            echo "    # machine by default." >> $file_name
+        echo "    static_configs:" >> $file_name
+            echo "      - targets: ['$host_ip:9100']" >> $file_name
+            echo "" >> $file_name
+            echo "  - job_name: 'jenkins'" >> $file_name
+            echo "    static_configs:" >> $file_name
+            echo "      - targets: ['10.128.151.10:8080']" >> $file_name
+            echo "    metrics_path: '/prometheus/'" >> $file_name
+            ;;
+
+
+        "tolgee")
         update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
-	    sleep 10
+            sleep 10
 
-	    echo "Creating database..."
-	    lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"CREATE DATABASE tolgee;\""
-	    echo "Creating user..."
-	    lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD 'password';\""
-    	    echo "Granting privileges..."
-	    lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
+            echo "Creating database..."
+            lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"CREATE DATABASE tolgee;\""
+            echo "Creating user..."
+            lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD 'fedhubs';\""
+            echo "Granting privileges..."
+            lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
 
-	    echo "Curl and shit..."
-	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
-	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=password\nserver.port=8200" > /var/lib/lxc/$container_name/rootfs/root/application.properties
+            echo "Curl and shit..."
+            lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
+            echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=fedhubs\nserver.port=8200" > /var/lib/lxc/$container_name/rootfs/root/application.properties
 
 
-	    touch /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "[Unit]" > /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "Description=Tolgee Service" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "After=network.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "[Service]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "User=root" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "WorkingDirectory=/root/" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "ExecStart=/usr/bin/java -Dtolgee.postgres-autostart.enabled=false -jar latest-release.jar" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "SuccessExitStatus=143" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "TimeoutStopSec=10" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "Restart=on-failure" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "RestartSec=5" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "[Install]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "WantedBy=multi-user.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
-	    lxc-attach $container_name -- bash -c "systemctl daemon-reload"
+            touch /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "[Unit]" > /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "Description=Tolgee Service" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "After=network.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "[Service]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "User=root" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "WorkingDirectory=/root/" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "ExecStart=/usr/bin/java -Dtolgee.postgres-autostart.enabled=false -jar latest-release.jar" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "SuccessExitStatus=143" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "TimeoutStopSec=10" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "Restart=on-failure" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "RestartSec=5" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "[Install]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            echo "WantedBy=multi-user.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+            lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
+            lxc-attach $container_name -- bash -c "systemctl daemon-reload"
 
-	    lxc-attach $container_name -- sleep 2
+            lxc-attach $container_name -- sleep 2
 
-	    lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
-	    ;;
+            lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
+            ;;
 
-	"appsmith")
-	    echo -e "Setting up appsmith...\n"
-	    cd ~
-    	    curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
-	    docker-compose up -d
-	    sleep 2
-	    echo -e "Setup done\n"
-	esac
+        "appsmith")
+            echo -e "Setting up appsmith...\n"
+            cd ~
+            curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
+            docker-compose up -d
+            sleep 2
+            echo -e "Setup done\n"
+        esac
 
     sleep 3
     lxc-info -n $container_name
@@ -260,21 +260,21 @@ main () {
     while [[ $choice_state == false ]]; do
         echo "    - Setup your system [1]"
         echo "    - Setup a new container [2]"
-	    echo ""
+            echo ""
         read -p "What would you like to do: " user_choice
         case $user_choice in
             1)
-                vps_setup_function
+                vps_setup_single
                 choice_state=true
                 ;;
             2)
-            	create_container
-            	choice_state=true
-            	;;
+                create_container
+                choice_state=true
+                ;;
             *)
-            	echo "Wrong input"
-            	;;
-    	esac
+                echo "Wrong input"
+                ;;
+        esac
     done
 
 }
