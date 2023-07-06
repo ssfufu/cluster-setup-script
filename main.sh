@@ -8,7 +8,7 @@ fi
 # checks if the ipcalc package is installed
 if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package is not installed... installing it"
-    apt install ipcalc -y >/dev/null
+    apt-get install ipcalc -y >/dev/null
     echo "ipcalc package installed"
 fi
 
@@ -59,9 +59,9 @@ vps_setup_single () {
     touch /root/mail.txt
     echo $mail_user > /root/mail.txt
 
-    apt install nginx -y
+    apt-get install nginx -y
     systemctl enable nginx && systemctl start nginx
-    apt install lxc snapd
+    apt-get install lxc snapd
     snap install core
     snap install lxd
 
@@ -72,22 +72,22 @@ vps_setup_single () {
     lxd network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
 
     # Installing Docker
-    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt remove $pkg; done
+    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
 
-    apt update
-    apt install ca-certificates curl gnupg
+    apt-get update
+    apt-get install ca-certificates curl gnupg
 
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
+    install -m 0755 -d /etc/apt-get/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt-get/keyrings/docker.gpg
+    chmod a+r /etc/apt-get/keyrings/docker.gpg
 
     echo \
-        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt-get/keyrings/docker.gpg] https://download.docker.com/linux/debian \
         "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-        tee /etc/apt/sources.list.d/docker.list > /dev/null
+        tee /etc/apt-get/sources.list.d/docker.list > /dev/null
 
-    apt update
-    apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils
+    apt-get update
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils
 
     groupadd docker
     usermod -aG docker $SUDO_USER
@@ -117,10 +117,10 @@ update_install_packages () {
     shift
     packages=("$@")
 
-    lxc-attach $container_name -- bash -c "apt update -y && apt install nano wget software-properties-common ca-certificates curl gnupg git -y"
+    lxc-attach $container_name -- bash -c "apt-get update -y && apt-get install nano wget software-properties-common ca-certificates curl gnupg git -y"
     sleep 20
     for i in "${packages[@]}"; do
-        lxc-attach $container_name -- apt install $i -y
+        lxc-attach $container_name -- apt-get install $i -y
     done
 
 }
@@ -217,8 +217,8 @@ create_container () {
 	    update_install_packages $container_name openjdk-11-jdk
 
     	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key |  tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
-	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt/sources.list.d/jenkins.list > /dev/null"
-    	lxc-attach $container_name -- apt update -y && apt install jenkins -y
+	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt-get/sources.list.d/jenkins.list > /dev/null"
+    	lxc-attach $container_name -- apt-get update -y && apt-get install jenkins -y
 	    lxc-attach $container_name -- systemctl start jenkins &&  systemctl enable jenkins
         nginx_setup $IP "8080" $container_name
     	;;
@@ -245,10 +245,10 @@ create_container () {
     
     "grafana")
         update_install_packages $container_name
-        wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
-        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
-        apt update -y
-        apt install grafana -y
+        wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
+        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
+        apt-get update -y
+        apt-get install grafana -y
         systemctl daemon-reload
         systemctl start grafana-server
         systemctl enable grafana-server.service
@@ -328,10 +328,10 @@ create_container () {
         sleep 10
         rm /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
         cp /root/cluster-setup-script/config-owncloud /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
-        lxc-attach $container_name -- bash -c "curl https://download.owncloud.org/download/repositories/production/Debian_11/Release.key | apt-key add -"
-        lxc-attach $container_name -- bash -c "echo 'deb http://download.owncloud.org/download/repositories/production/Debian_11/ /' > /etc/apt/sources.list.d/owncloud.list"
-        lxc-attach $container_name -- apt update -y
-        lxc-attach $container_name -- apt install -y owncloud-files
+        lxc-attach $container_name -- bash -c "curl https://download.owncloud.org/download/repositories/production/Debian_11/Release.key | apt-get-key add -"
+        lxc-attach $container_name -- bash -c "echo 'deb http://download.owncloud.org/download/repositories/production/Debian_11/ /' > /etc/apt-get/sources.list.d/owncloud.list"
+        lxc-attach $container_name -- apt-get update -y
+        lxc-attach $container_name -- apt-get install -y owncloud-files
 
         # Configure MariaDB
         echo -n "Please enter a owncloud database password: "
