@@ -18,7 +18,7 @@ nginx_setup() {
     local CT_PORT="$2"
     local CT_NAME="$3"
     local DOMAIN="$(cat /root/domain.txt)"
-    local MAIL="$(cat /root/mail/txt)"
+    local MAIL="$(cat /root/mail.txt)"
 
     # construct server_name and proxy_pass
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
