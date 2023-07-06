@@ -1,5 +1,5 @@
-*#!/bin/bash
-# checks if the user is root
+#!/bin/bash
+# checks if the script is launched as root
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
     exit 1
@@ -12,48 +12,100 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package installed"
 fi
 
+nginx_setup() {
+    # Get parameters
+    local CT_IP="$1"
+    local CT_PORT="$2"
+    local CT_NAME="$3"
+    local DOMAIN="$(cat /root/domain.txt)"
+    local MAIL="$(cat /root/mail/txt)"
+
+    # construct server_name and proxy_pass
+    local SERVER_NAME="${CT_NAME}.${DOMAIN}"
+    local PROXY_PASS="http://${CT_IP}:${CT_PORT}"
+    local PROXY_REDIRECT="http://${CT_IP}:${CT_PORT} https://${SERVER_NAME}"
+
+    # create a directory for this site if it doesn't exist
+    touch /etc/nginx/sites-available/${CT_NAME}
+
+    # substitute placeholders with variable values in the template and create a new config file
+    sed -e "s#server_name#server_name ${SERVER_NAME};#g" \
+        -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
+        -e "s#proxy_redirect#proxy_redirect ${PROXY_REDIRECT};#g" \
+        -e "s#/etc/letsencrypt/live//#/etc/letsencrypt/live/${SERVER_NAME}/#g" \
+        -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" \
+        -e "s#server_name#server_name ${SERVER_NAME};#g" /root/cluster-setup-script/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
+
+    ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/
+    
+    systemctl stop nginx
+
+    certbot certonly --standalone -d ${SERVER_NAME} --email ${MAIL} --agree-tos --no-eff-email --noninteractive --force-renewal
+    
+    systemctl start nginx
+
+}
+
 vps_setup_single () {
-    sudo apt install nginx -y
-    sudo systemctl enable nginx && sudo systemctl start nginx
-    sudo apt install lxc snapd
-    sudo snap install core
-    sudo snap install lxd
+    # create a new user and add it to the sudo group
+    adduser devops
+    usermod -aG sudo devops
+    
+    read -p "What is your domain name ?: " domain_user
+    touch /root/domain.txt
+    echo $domain_user >> /root/domain.txt
 
-    sudo adduser $SUDO_USER lxd
-    newgrp lxd
-    sudo -i
+    apt install nginx -y
+    systemctl enable nginx && systemctl start nginx
+    apt install lxc snapd
+    snap install core
+    snap install lxd
 
-    # Ne pas créer de bridge par défaut
-    lxd init
-    exit
+    adduser $SUDO_USER lxd
+    su -c "lxd init" $SUDO_USER
+
+    lxd network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
+    lxd network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
 
     # Installing Docker
-    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do sudo apt-get remove $pkg; done
+    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt remove $pkg; done
 
-    sudo apt-get update
-    sudo apt-get install ca-certificates curl gnupg
+    apt update
+    apt install ca-certificates curl gnupg
 
-    sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
 
     echo \
-      "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-      "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+        "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    sudo apt-get update
-    sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt update
+    apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils
 
-    sudo groupadd docker
-    sudo usermod -aG docker $SUDO_USER
-    newgrp docker
+    groupadd docker
+    usermod -aG docker $SUDO_USER
 
-    sudo systemctl enable docker.service
-    sudo systemctl enable containerd.service
+    systemctl enable docker.service
+    systemctl enable containerd.service
 
-    sudo docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.41.0
-    
+    docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
+    nginx_setup "localhost" "8080" "cadvisor"
+    docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
+
+
+    cd /root/
+    mkdir wireguard_script && cd wireguard_script
+    curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
+    chmod +x wireguard-install.sh
+    ./wireguard-install.sh
+
+    echo -e "-------------SETUP DONE-------------\n"
+    echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
+    echo "And also a cadvisor web pannel at cadvisor.$domain_user"
+
 }
 
 update_install_packages () {
@@ -61,8 +113,8 @@ update_install_packages () {
     shift
     packages=("$@")
 
-    lxc-attach $container_name -- apt update -y
-    lxc-attach $container_name -- apt install nano wget software-properties-common ca-certificates curl gnupg git -y
+    lxc-attach $container_name -- bash -c "apt update -y && apt install nano wget software-properties-common ca-certificates curl gnupg git -y"
+    sleep 20
     for i in "${packages[@]}"; do
         lxc-attach $container_name -- apt install $i -y
     done
@@ -72,6 +124,7 @@ update_install_packages () {
 create_container () {
     # ask the user for the container name
     read -p "Enter the container name: " container_name
+    echo "jenkins, prometheus, grafana, tolgee, appsmith, n8n, owncloud"
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
     if [ -z "$container_name" ]; then
         echo "You must enter a container name"
@@ -108,6 +161,9 @@ create_container () {
         echo "You must enter an IP address"
         exit 1
     fi
+
+    dom="$(cat /root/domain.txt)"
+    srv_name="${container_name}.${dom}"
 
     echo ""
 
@@ -153,84 +209,141 @@ create_container () {
     echo "Installing required packages..."
 
     case $container_name in
-        "jenkins")
-            update_install_packages $container_name openjdk-11-jdk
+	"jenkins")
+	    update_install_packages $container_name openjdk-11-jdk
 
-        lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
-            lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null"
-        lxc-attach $container_name -- apt update -y && apt install jenkins -y
-            lxc-attach $container_name -- systemctl start jenkins && sudo systemctl enable jenkins
+    	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key |  tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
+	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt/sources.list.d/jenkins.list > /dev/null"
+    	lxc-attach $container_name -- apt update -y && apt install jenkins -y
+	    lxc-attach $container_name -- systemctl start jenkins &&  systemctl enable jenkins
+        nginx_setup $IP "8080" $container_name
+    	;;
+
+
+	"prometheus")
+	    update_install_packages $container_name prometheus
+	    file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
+	    host_ip=$(ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//')
+
+	    # Add the content to the file
+	    echo "" >> $file_name
+	    echo "  - job_name: node" >> $file_name
+	    echo "    # If prometheus-node-exporter is installed, grab stats about the local" >> $file_name
+	    echo "    # machine by default." >> $file_name
+    	echo "    static_configs:" >> $file_name
+	    echo "      - targets: ['$host_ip:9100']" >> $file_name
+	    echo "" >> $file_name
+	    echo "  - job_name: 'jenkins'" >> $file_name
+	    echo "    static_configs:" >> $file_name
+	    echo "      - targets: ['10.128.151.10:8080']" >> $file_name
+	    echo "    metrics_path: '/prometheus/'" >> $file_name
+	    ;;
+    
+    "grafana")
+        update_install_packages $container_name
+        wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+        apt update -y
+        apt install grafana -y
+        systemctl daemon-reload
+        systemctl start grafana-server
+        systemctl enable grafana-server.service
+        nginx_setup $IP "3000" $srv_name
         ;;
 
 
-        "prometheus")
-            update_install_packages $container_name prometheus
-            file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
-            host_ip=$(ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//')
+	"tolgee")
+        update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
+	    sleep 10
 
-            # Add the content to the file
-            echo "" >> $file_name
-            echo "  - job_name: node" >> $file_name
-            echo "    # If prometheus-node-exporter is installed, grab stats about the local" >> $file_name
-            echo "    # machine by default." >> $file_name
-            echo "    static_configs:" >> $file_name
-            echo "      - targets: ['$host_ip:9100']" >> $file_name
-            echo "" >> $file_name
-            echo "  - job_name: 'jenkins'" >> $file_name
-            echo "    static_configs:" >> $file_name
-            echo "      - targets: ['10.128.151.10:8080']" >> $file_name
-            echo "    metrics_path: '/prometheus/'" >> $file_name
+	    echo "Creating database..."
+	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE DATABASE tolgee;\""
+	    echo "Creating user..."
+	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD 'fedhubs';\""
+    	echo "Granting privileges..."
+	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
+
+	    echo "Curl and shit..."
+	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
+        sleep 5
+	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=fedhubs\nserver.port=8200" > /var/lib/lxc/$container_name/rootfs/root/application.properties
+
+
+	    touch /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "[Unit]" > /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "Description=Tolgee Service" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "After=network.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "[Service]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "User=root" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "WorkingDirectory=/root/" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "ExecStart=/usr/bin/java -Dtolgee.postgres-autostart.enabled=false -jar latest-release.jar" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "SuccessExitStatus=143" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "TimeoutStopSec=10" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "Restart=on-failure" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "RestartSec=5" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "[Install]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+	    echo "WantedBy=multi-user.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+
+	    lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
+        sleep 2
+	    lxc-attach $container_name -- bash -c "systemctl daemon-reload"
+	    sleep 2
+	    lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
+        sleep 5
+        nginx_setup $IP "8200" $srv_name
+	    ;;
+
+	"appsmith")
+	    echo -e "Setting up appsmith...\n"
+	    mkdir /root/appsmith
+        cd /root/appsmith
+
+    	curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
+
+        # Change the ports
+        sed -i 's/80:80/8000:80/g' $PWD/docker-compose.yml
+        # sed -i 's/443:443/8443:443/g' $PWD/docker-compose.yml
+
+	    docker-compose up -d
+	    sleep 2
+        nginx_setup "localhost" "8000" "appsmith"
+
+	    echo -e "Setup done\n"
         ;;
 
+    "n8n")
+        cd /root/cluster-setup-script
+        docker-compose up -d
+        sleep 5
+        nginx_setup "localhost" "5678" $srv_name
+        ;;
+    "owncloud")
+        update_install_packages $container_name mariadb-server php-fpm php-mysql php-xml php-mbstring php-gd php-curl nginx php7.4-fpm php7.4-mysql php7.4-common php7.4-gd php7.4-json php7.4-curl php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl
+        sleep 10
+        rm /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
+        cp /root/cluster-setup-script/config-owncloud /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
+        lxc-attach $container_name -- bash -c "curl https://download.owncloud.org/download/repositories/production/Debian_11/Release.key | apt-key add -"
+        lxc-attach $container_name -- bash -c "echo 'deb http://download.owncloud.org/download/repositories/production/Debian_11/ /' > /etc/apt/sources.list.d/owncloud.list"
+        lxc-attach $container_name -- apt update -y
+        lxc-attach $container_name -- apt install -y owncloud-files
 
-        "tolgee")
-            update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
-            sleep 10
+        # Configure MariaDB
+        echo -n "Please enter a owncloud database password: "
+        read -s db_password
+        lxc-attach $container_name -- bash -c "mysql -e \"CREATE DATABASE owncloud; GRANT ALL ON owncloud.* to 'owncloud'@'localhost' IDENTIFIED BY '$db_password'; FLUSH PRIVILEGES;\""
 
-            echo "Creating database..."
-            lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"CREATE DATABASE tolgee;\""
-            echo "Creating user..."
-            lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD 'fedhubs';\""
-            echo "Granting privileges..."
-            lxc-attach $container_name -- bash -c "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
-
-            echo "Curl and shit..."
-            lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
-            echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=fedhubs\nserver.port=8200" > /var/lib/lxc/$container_name/rootfs/root/application.properties
-
-
-            touch /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "[Unit]" > /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "Description=Tolgee Service" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "After=network.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "[Service]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "User=root" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "WorkingDirectory=/root/" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "ExecStart=/usr/bin/java -Dtolgee.postgres-autostart.enabled=false -jar latest-release.jar" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "SuccessExitStatus=143" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "TimeoutStopSec=10" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "Restart=on-failure" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "RestartSec=5" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "[Install]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            echo "WantedBy=multi-user.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-            lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
-            lxc-attach $container_name -- bash -c "systemctl daemon-reload"
-
-            lxc-attach $container_name -- sleep 2
-
-            lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
-            ;;
-
-        "appsmith")
-            echo -e "Setting up appsmith...\n"
-            cd ~
-            curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
-            docker-compose up -d
-            sleep 2
-            echo -e "Setup done\n"
-        esac
+        # Configure PHP
+        lxc-attach $container_name -- bash -c "sed -i 's/post_max_size = .*/post_max_size = 2000M/' /etc/php/7.4/fpm/php.ini"
+        lxc-attach $container_name -- bash -c "sed -i 's/upload_max_filesize = .*/upload_max_filesize = 2000M/' /etc/php/7.4/fpm/php.ini"
+        lxc-attach $container_name -- bash -c "sed -i 's/max_execution_time = .*/max_execution_time = 3600/' /etc/php/7.4/fpm/php.ini"
+        lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
+        lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
+        lxc-attach $container_name -- bash -c "systemctl restart nginx"
+        nginx_setup $IP "80" $server_name
+        ;;
+	esac
 
     sleep 3
     lxc-info -n $container_name
@@ -260,7 +373,7 @@ main () {
     while [[ $choice_state == false ]]; do
         echo "    - Setup your system [1]"
         echo "    - Setup a new container [2]"
-            echo ""
+	    echo ""
         read -p "What would you like to do: " user_choice
         case $user_choice in
             1)
@@ -268,13 +381,13 @@ main () {
                 choice_state=true
                 ;;
             2)
-                create_container
-                choice_state=true
-                ;;
+            	create_container
+            	choice_state=true
+            	;;
             *)
-                echo "Wrong input"
-                ;;
-        esac
+            	echo "Wrong input"
+            	;;
+    	esac
     done
 
 }
