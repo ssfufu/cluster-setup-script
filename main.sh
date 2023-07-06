@@ -51,9 +51,13 @@ vps_setup_single () {
     adduser devops
     usermod -aG sudo devops
     
-    read -p "What is your domain name ?: " domain_user
+    read -p "What is your domain(s) ? " domain_user
     touch /root/domain.txt
-    echo $domain_user >> /root/domain.txt
+    echo $domain_user > /root/domain.txt
+
+    read -p "What is your e-mail? " mail_user
+    touch /root/mail.txt
+    echo $mail_user > /root/mail.txt
 
     apt install nginx -y
     systemctl enable nginx && systemctl start nginx
