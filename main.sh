@@ -31,24 +31,8 @@ nginx_setup() {
 
     # create a directory for this site if it doesn't exist
     touch /etc/nginx/sites-available/${CT_NAME}
-    rm /etc/letsencrypt/options-ssl-nginx.conf
-    touch /etc/letsencrypt/options-ssl-nginx.conf
 
-    echo "# This file contains important security parameters. If you modify this file" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "# manually, Certbot will be unable to automatically provide future security" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "# updates. Instead, Certbot will print and log an error message with a path to" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "# the up-to-date file that you will need to refer to when manually updating" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "# this file." >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "ssl_session_cache shared:le_nginx_SSL:10m;" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "ssl_session_timeout 1440m;" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "ssl_session_tickets off;" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "ssl_protocols TLSv1.2 TLSv1.3;" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "ssl_prefer_server_ciphers off;" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "" >> /etc/letsencrypt/options-ssl-nginx.conf
-    echo "ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384";" >> /etc/letsencrypt/options-ssl-nginx.conf
-
+    cp /root/cluster-setup-script/ssl.conf /etc/letsencrypt/options-ssl-nginx.conf
     # substitute placeholders with variable values in the template and create a new config file
     sed -e "s#server_name#server_name ${SERVER_NAME};#g" \
         -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
