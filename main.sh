@@ -9,6 +9,7 @@ fi
 if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package is not installed... installing it"
     apt-get install ipcalc -y >/dev/null
+    sleep 2
     echo "ipcalc package installed"
 fi
 
@@ -24,6 +25,9 @@ nginx_setup() {
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
     local PROXY_PASS="http://${CT_IP}:${CT_PORT}"
     local PROXY_REDIRECT="http://${CT_IP}:${CT_PORT} https://${SERVER_NAME}"
+
+    # deletes the file if already exists
+    rm /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enable/${CT_NAME}
 
     # create a directory for this site if it doesn't exist
     touch /etc/nginx/sites-available/${CT_NAME}
@@ -60,10 +64,15 @@ vps_setup_single () {
     echo $mail_user > /root/mail.txt
 
     apt-get install nginx -y
+    sleep 1
     systemctl enable nginx && systemctl start nginx
-    apt-get install lxc snapd
+    apt-get install lxc snapd -y
+    sleep 5
     snap install core
+    sleep 5
     snap install lxd
+    sleep 5
+
 
     adduser $SUDO_USER lxd
     su -c "lxd init" $SUDO_USER
@@ -74,8 +83,9 @@ vps_setup_single () {
     # Installing Docker
     for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
 
-    apt-get update
-    apt-get install ca-certificates curl gnupg
+    apt-get update -y
+    sleep 3
+    apt-get install ca-certificates curl gnupg -y
 
     install -m 0755 -d /etc/apt-get/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt-get/keyrings/docker.gpg
@@ -86,8 +96,8 @@ vps_setup_single () {
         "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
         tee /etc/apt-get/sources.list.d/docker.list > /dev/null
 
-    apt-get update
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils -y
 
     groupadd docker
     usermod -aG docker $SUDO_USER
