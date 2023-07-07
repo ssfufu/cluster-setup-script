@@ -87,7 +87,8 @@ vps_setup_single () {
     sleep 2
     snap install lxd
     sleep 2
-    sudo snap install --classic certbot
+    snap install --classic certbot
+    sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
 
@@ -127,14 +128,14 @@ vps_setup_single () {
     docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
 
-    cd /root/
-    mkdir wireguard_script && cd wireguard_script
-    curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
-    chmod +x wireguard-install.sh
-    ./wireguard-install.sh
+    #cd /root/
+    #mkdir wireguard_script && cd wireguard_script
+    #curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
+    #chmod +x wireguard-install.sh
+    #./wireguard-install.sh
 
     echo -e "-------------SETUP DONE-------------\n"
-    echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
+    #echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
     echo "And also a cadvisor web pannel at cadvisor.$domain_user"
 
 }
