@@ -75,6 +75,10 @@ vps_setup_single () {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
+    openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+    systemctl reload nginx
+    chmod 644 /etc/letsencrypt/ssl-dhparams.pem
+
 
     adduser $SUDO_USER lxd
     su -c "lxd init" $SUDO_USER
@@ -82,6 +86,11 @@ vps_setup_single () {
     lxd network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
     lxd network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
 
+    echo ""
+    echo ""
+    echo "--------------------INSTALLING DOCKER--------------------"
+    echo ""
+    echo ""
     # Installing Docker
     for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
 
@@ -109,12 +118,19 @@ vps_setup_single () {
 
     systemctl restart docker.socket
     systemctl restart docker.service
+    echo ""
+    echo ""
+    echo "--------------------DOCKER ISNTALLED--------------------"
+    echo ""
+    echo ""
 
     docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
     nginx_setup "localhost" "8080" "cadvisor"
     docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
-
+    echo ""
+    echo ""
+    
     #cd /root/
     #mkdir wireguard_script && cd wireguard_script
     #curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
