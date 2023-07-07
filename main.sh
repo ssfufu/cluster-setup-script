@@ -74,8 +74,8 @@ vps_setup_single () {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
-    rm /etc/letsencrypt/options-ssl-nginx.conf
-    cp /root/cluster-setup-script/ssl.conf /etc/letsencrypt/options-ssl-nginx.conf
+    rm /etc/letsencrypt/options-ssl-nginx.conf > /dev/null
+    cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/
     openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
     chmod 644 /etc/letsencrypt/ssl-dhparams.pem
     systemctl restart nginx.service
