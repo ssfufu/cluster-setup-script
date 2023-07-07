@@ -27,7 +27,7 @@ nginx_setup() {
     local PROXY_REDIRECT="http://${CT_IP}:${CT_PORT} https://${SERVER_NAME}"
 
     # deletes the file if already exists
-    rm /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enable/${CT_NAME}
+    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enable/$CT_NAME
 
     # create a directory for this site if it doesn't exist
     touch /etc/nginx/sites-available/${CT_NAME}
@@ -67,11 +67,13 @@ vps_setup_single () {
     sleep 1
     systemctl enable nginx && systemctl start nginx
     apt-get install lxc snapd -y
-    sleep 5
+    sleep 2
+    apt-get install certbot python3-certbot-nginx -y
+    sleep 2
     snap install core
-    sleep 5
+    sleep 2
     snap install lxd
-    sleep 5
+    sleep 2
 
 
     adduser $SUDO_USER lxd
@@ -100,7 +102,7 @@ vps_setup_single () {
     apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils -y
 
     groupadd docker
-    usermod -aG docker $SUDO_USER
+    usermod -aG docker devops
 
     systemctl enable docker.service
     systemctl enable containerd.service
