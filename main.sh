@@ -32,7 +32,6 @@ nginx_setup() {
     # create a directory for this site if it doesn't exist
     touch /etc/nginx/sites-available/${CT_NAME}
 
-    cp /root/cluster-setup-script/ssl.conf /etc/letsencrypt/options-ssl-nginx.conf
     # substitute placeholders with variable values in the template and create a new config file
     sed -e "s#server_name#server_name ${SERVER_NAME};#g" \
         -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
@@ -75,16 +74,18 @@ vps_setup_single () {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
+    rm /etc/letsencrypt/options-ssl-nginx.conf
+    cp /root/cluster-setup-script/ssl.conf /etc/letsencrypt/options-ssl-nginx.conf
     openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
-    systemctl reload nginx
     chmod 644 /etc/letsencrypt/ssl-dhparams.pem
+    systemctl restart nginx.service
 
 
     adduser $SUDO_USER lxd
     su -c "lxd init" $SUDO_USER
 
-    lxd network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
-    lxd network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
+    lxc network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
+    lxc network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
 
     echo ""
     echo ""
@@ -113,11 +114,12 @@ vps_setup_single () {
     groupadd docker
     usermod -aG docker devops
 
+    systemctl restart docker.socket
+    systemctl restart docker.service
+
     systemctl enable docker.service
     systemctl enable containerd.service
 
-    systemctl restart docker.socket
-    systemctl restart docker.service
     echo ""
     echo ""
     echo "--------------------DOCKER ISNTALLED--------------------"
@@ -130,12 +132,14 @@ vps_setup_single () {
 
     echo ""
     echo ""
-    
+
     #cd /root/
     #mkdir wireguard_script && cd wireguard_script
     #curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
     #chmod +x wireguard-install.sh
     #./wireguard-install.sh
+
+    systemctl restart nginx.service
 
     echo -e "-------------SETUP DONE-------------\n"
     #echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
