@@ -37,8 +37,7 @@ nginx_setup() {
         -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
         -e "s#proxy_redirect#proxy_redirect ${PROXY_REDIRECT};#g" \
         -e "s#/etc/letsencrypt/live//#/etc/letsencrypt/live/${SERVER_NAME}/#g" \
-        -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" \
-        -e "s#server_name#server_name ${SERVER_NAME};#g" /root/cluster-setup-script/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
+        -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" /root/cluster-setup-script/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
 
     ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/
     
