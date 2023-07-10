@@ -456,7 +456,7 @@ function create_container () {
         lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
         lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
         lxc-attach $container_name -- bash -c "systemctl restart nginx"
-        nginx_ct_setup $IP "80" $server_name
+        nginx_ct_setup $IP "80" $srv_name
         ;;
 	esac
 
