@@ -13,7 +13,91 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package installed successfully"
 fi
 
-nginx_setup() {
+docker_setup () {
+    echo ""
+    echo ""
+    echo "--------------------INSTALLING DOCKER--------------------"
+    echo ""
+    echo ""
+
+    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
+
+    apt-get update -y
+    sleep 3
+    apt-get install ca-certificates curl gnupg -y
+
+    install -m 0755 -d /etc/apt-get/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt-get/keyrings/docker.gpg
+    chmod a+r /etc/apt-get/keyrings/docker.gpg
+
+    echo \
+        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt-get/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+        "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+        tee /etc/apt-get/sources.list.d/docker.list > /dev/null
+
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils -y
+
+    groupadd docker
+    usermod -aG docker devops
+
+    systemctl restart docker.socket
+    systemctl restart docker.service
+
+    systemctl enable docker.service
+    systemctl enable containerd.service
+
+    echo ""
+    echo ""
+    echo "--------------------DOCKER INSTALLED--------------------"
+}
+
+wireguard_setup () {
+    echo "--------------------INSTALLING WIREGUARD--------------------"
+
+    # detects if IPV6 is disabled and enables it
+    if ! grep -q "net.ipv6.conf.all.disable_ipv6 = 0" /etc/sysctl.conf; then
+        echo "net.ipv6.conf.all.disable_ipv6 = 0" >> /etc/sysctl.conf
+        echo "net.ipv6.conf.default.disable_ipv6 = 0" >> /etc/sysctl.conf
+        echo "net.ipv6.conf.lo.disable_ipv6 = 0" >> /etc/sysctl.conf
+        sysctl -p
+    fi
+
+    cd /root/
+    mkdir wireguard_script && cd wireguard_script
+    curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
+    chmod +x wireguard-install.sh
+    ./wireguard-install.sh
+    systemctl restart wg-quick@wg0.service
+
+    echo ""
+    echo ""
+    echo "--------------------WIREGUARD ISNTALLED--------------------"
+}
+
+lxc_lxd_setup () {
+    echo ""
+    echo ""
+    echo "--------------------LXC/LXD INSTALLATION--------------------"
+    apt-get install lxc snapd -y
+    sleep 2
+    snap install core
+    sleep 2
+    snap install lxd
+    sleep 2
+
+    adduser devops lxd
+    su -c "lxd init" devops
+
+    lxc network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
+    lxc network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
+
+    echo ""
+    echo ""
+    echo "--------------------LXC INSTALLED--------------------"    
+}
+
+nginx_ct_setup() {
     # Get parameters
     local CT_IP="$1"
     local CT_PORT="$2"
@@ -61,6 +145,34 @@ nginx_setup() {
 
 }
 
+nginx_setup () {
+    echo ""
+    echo ""
+    echo "--------------------NGINX INSTALLATION--------------------"
+    apt-get install nginx -y
+    sleep 1
+    systemctl enable nginx && systemctl start nginx
+    snap install --classic certbot
+    sleep 1
+    ln -s /snap/bin/certbot /usr/bin/certbot
+
+    rm /etc/nginx/sites-available/default
+    rm /etc/nginx/sites-enabled/default
+    cp /root/cluster-setup-script/default_conf /etc/nginx/sites-available/default
+    ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+
+    rm /etc/letsencrypt/options-ssl-nginx.conf > /dev/null
+    mkdir -p /etc/letsencrypt/
+    cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
+    openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+    chmod 644 /etc/letsencrypt/ssl-dhparams.pem
+    systemctl restart nginx.service
+
+    echo ""
+    echo ""
+    echo "--------------------NGINX INSTALLED--------------------"
+}
+
 vps_setup_single () {
     # create a new user and add it to the sudo group
     adduser devops
@@ -76,113 +188,20 @@ vps_setup_single () {
 
     read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
 
-    apt-get install nginx -y
-    sleep 1
-    systemctl enable nginx && systemctl start nginx
-    apt-get install lxc snapd -y
-    sleep 2
-    snap install core
-    sleep 2
-    snap install lxd
-    sleep 2
-    snap install --classic certbot
-    sleep 1
-    ln -s /snap/bin/certbot /usr/bin/certbot
-
-    rm /etc/nginx/sites-available/default
-    rm /etc/nginx/sites-enabled/default
-    cp /root/cluster-setup-script/default_conf /etc/nginx/sites-available/default
-    ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
-
-    #certbot certonly --standalone -d ${domain_user} --email ${mail_user} --agree-tos --no-eff-email --noninteractive --force-renewal
-
-
-    rm /etc/letsencrypt/options-ssl-nginx.conf > /dev/null
-    mkdir -p /etc/letsencrypt/
-    cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
-    openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
-    chmod 644 /etc/letsencrypt/ssl-dhparams.pem
-    systemctl restart nginx.service
-
-
-    adduser devops lxd
-    su -c "lxd init" devops
-
-    lxc network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
-    lxc network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
-
     echo ""
     echo ""
-    echo "--------------------INSTALLING DOCKER--------------------"
-    echo ""
-    echo ""
-    # Installing Docker
-    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
-
-    apt-get update -y
-    sleep 3
-    apt-get install ca-certificates curl gnupg -y
-
-    install -m 0755 -d /etc/apt-get/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt-get/keyrings/docker.gpg
-    chmod a+r /etc/apt-get/keyrings/docker.gpg
-
-    echo \
-        "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt-get/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-        "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-        tee /etc/apt-get/sources.list.d/docker.list > /dev/null
-
-    apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils -y
-
-    groupadd docker
-    usermod -aG docker devops
-
-    systemctl restart docker.socket
-    systemctl restart docker.service
-
-    systemctl enable docker.service
-    systemctl enable containerd.service
-
-    echo ""
-    echo ""
-    echo "--------------------DOCKER INSTALLED--------------------"
-    echo ""
-    echo ""
-
     echo "--------------------INSTALLING CADVISOR--------------------"
 
     docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_setup "127.0.0.1" "8080" "monitor" $allowed_ips
+    nginx_ct_setup "127.0.0.1" "8080" "monitor" $allowed_ips
     docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
-
+    echo ""
     echo ""
     echo "--------------------CADVISOR INSTALLED--------------------"
 
     echo ""
     echo ""
-
-    echo "--------------------INSTALLING WIREGUARD--------------------"
-
-    # detects if IPV6 is disabled and enables it
-    if ! grep -q "net.ipv6.conf.all.disable_ipv6 = 0" /etc/sysctl.conf; then
-        echo "net.ipv6.conf.all.disable_ipv6 = 0" >> /etc/sysctl.conf
-        echo "net.ipv6.conf.default.disable_ipv6 = 0" >> /etc/sysctl.conf
-        echo "net.ipv6.conf.lo.disable_ipv6 = 0" >> /etc/sysctl.conf
-        sysctl -p
-    fi
-
-    cd /root/
-    mkdir wireguard_script && cd wireguard_script
-    curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
-    chmod +x wireguard-install.sh
-    ./wireguard-install.sh
-    systemctl restart wg-quick@wg0.service
-
-    echo ""
-    echo ""
-    echo "--------------------WIREGUARD ISNTALLED--------------------"
 
     systemctl restart nginx.service
 
@@ -302,7 +321,7 @@ create_container () {
 	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt-get/sources.list.d/jenkins.list > /dev/null"
     	lxc-attach $container_name -- apt-get update -y && apt-get install jenkins -y
 	    lxc-attach $container_name -- systemctl start jenkins &&  systemctl enable jenkins
-        nginx_setup $IP "8080" $container_name
+        nginx_ct_setup $IP "8080" $container_name
     	;;
 
 
@@ -334,7 +353,7 @@ create_container () {
         systemctl daemon-reload
         systemctl start grafana-server
         systemctl enable grafana-server.service
-        nginx_setup $IP "3000" $srv_name
+        nginx_ct_setup $IP "3000" $srv_name
         ;;
 
 
@@ -351,8 +370,6 @@ create_container () {
     	echo "Granting privileges..."
 	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
 
-
-	    echo "Curl and shit..."
 	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
         sleep 5
 	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=${db_password}\nserver.port=8200" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
@@ -380,7 +397,7 @@ create_container () {
 	    sleep 2
 	    lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
         sleep 5
-        nginx_setup $IP "8200" $srv_name
+        nginx_ct_setup $IP "8200" $srv_name
 	    ;;
 
 	"appsmith")
@@ -396,7 +413,7 @@ create_container () {
 
 	    docker-compose up -d
 	    sleep 2
-        nginx_setup "localhost" "8000" "appsmith"
+        nginx_ct_setup "localhost" "8000" "appsmith"
 
 	    echo -e "Setup done\n"
         ;;
@@ -405,7 +422,7 @@ create_container () {
         cd /root/cluster-setup-script
         docker-compose up -d
         sleep 5
-        nginx_setup "localhost" "5678" $srv_name
+        nginx_ct_setup "localhost" "5678" $srv_name
         ;;
     "owncloud")
         update_install_packages $container_name mariadb-server php-fpm php-mysql php-xml php-mbstring php-gd php-curl nginx php7.4-fpm php7.4-mysql php7.4-common php7.4-gd php7.4-json php7.4-curl php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl
@@ -429,7 +446,7 @@ create_container () {
         lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
         lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
         lxc-attach $container_name -- bash -c "systemctl restart nginx"
-        nginx_setup $IP "80" $server_name
+        nginx_ct_setup $IP "80" $server_name
         ;;
 	esac
 
