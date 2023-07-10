@@ -106,9 +106,9 @@ function nginx_ct_setup() {
     local DOMAIN="$(cat /root/domain.txt)"
     local MAIL="$(cat /root/mail.txt)"
 
-    # Get the server's IP address and add it to the allowed IPs
+    # Get the server's IP address and the VPN's IP range and add it to the allowed IPs
     local SERVER_IP=$(curl -s ifconfig.me)
-    ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP"
+    ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP 10.66.66.0/24"
 
     # construct server_name and proxy_pass
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
