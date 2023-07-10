@@ -1,5 +1,5 @@
 #!/bin/bash
-# checks if the script is launched as root
+# checks if the script is launched as root or not
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
     exit 1
