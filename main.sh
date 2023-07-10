@@ -18,8 +18,13 @@ nginx_setup() {
     local CT_IP="$1"
     local CT_PORT="$2"
     local CT_NAME="$3"
+    local ALLOWED_IPS="$4"
     local DOMAIN="$(cat /root/domain.txt)"
     local MAIL="$(cat /root/mail.txt)"
+
+    # Get the server's IP address and add it to the allowed IPs
+    local SERVER_IP=$(curl -s ifconfig.me)
+    ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP"
 
     # construct server_name and proxy_pass
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
@@ -38,8 +43,15 @@ nginx_setup() {
         -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
         -e "s#proxy_redirect#proxy_redirect ${PROXY_REDIRECT};#g" \
         -e "s#/etc/letsencrypt/live//#/etc/letsencrypt/live/${SERVER_NAME}/#g" \
-        -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" /root/cluster-setup-script/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
+        -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" \
+        -e "/location \/ {/a deny all;" /root/cluster-setup-script/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
+    
+    # Add the allowed IPs
+    for ip in $ALLOWED_IPS; do
+        sed -i "/deny all;/i allow $ip;" "/etc/nginx/sites-available/${CT_NAME}"
+    done
 
+    # create a symlink to the sites-enabled directory
     ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/
     
     systemctl stop nginx
@@ -62,6 +74,8 @@ vps_setup_single () {
     touch /root/mail.txt
     echo $mail_user > /root/mail.txt
 
+    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
+
     apt-get install nginx -y
     sleep 1
     systemctl enable nginx && systemctl start nginx
@@ -80,7 +94,7 @@ vps_setup_single () {
     cp /root/cluster-setup-script/default_conf /etc/nginx/sites-available/default
     ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
 
-    certbot certonly --standalone -d ${domain_user} --email ${mail_user} --agree-tos --no-eff-email --noninteractive --force-renewal
+    #certbot certonly --standalone -d ${domain_user} --email ${mail_user} --agree-tos --no-eff-email --noninteractive --force-renewal
 
 
     rm /etc/letsencrypt/options-ssl-nginx.conf > /dev/null
@@ -132,28 +146,51 @@ vps_setup_single () {
 
     echo ""
     echo ""
-    echo "--------------------DOCKER ISNTALLED--------------------"
+    echo "--------------------DOCKER INSTALLED--------------------"
     echo ""
     echo ""
+
+    echo "--------------------INSTALLING CADVISOR--------------------"
 
     docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_setup "127.0.0.1" "8080" "monitor"
+    nginx_setup "127.0.0.1" "8080" "monitor" $allowed_ips
     docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
+
+    echo ""
+    echo "--------------------CADVISOR INSTALLED--------------------"
+
     echo ""
     echo ""
 
-    #cd /root/
-    #mkdir wireguard_script && cd wireguard_script
-    #curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
-    #chmod +x wireguard-install.sh
-    #./wireguard-install.sh
+    echo "--------------------INSTALLING WIREGUARD--------------------"
+
+    # detects if IPV6 is disabled and enables it
+    if ! grep -q "net.ipv6.conf.all.disable_ipv6 = 0" /etc/sysctl.conf; then
+        echo "net.ipv6.conf.all.disable_ipv6 = 0" >> /etc/sysctl.conf
+        echo "net.ipv6.conf.default.disable_ipv6 = 0" >> /etc/sysctl.conf
+        echo "net.ipv6.conf.lo.disable_ipv6 = 0" >> /etc/sysctl.conf
+        sysctl -p
+    fi
+
+    cd /root/
+    mkdir wireguard_script && cd wireguard_script
+    curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
+    chmod +x wireguard-install.sh
+    ./wireguard-install.sh
+    systemctl restart wg-quick@wg0.service
+
+    echo ""
+    echo ""
+    echo "--------------------WIREGUARD ISNTALLED--------------------"
 
     systemctl restart nginx.service
 
     echo -e "-------------SETUP DONE-------------\n"
-    #echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
+    echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
     echo "And also a cadvisor web pannel at cadvisor.$domain_user"
+
+    echo ""
 
 }
 
