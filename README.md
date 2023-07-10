@@ -1,5 +1,20 @@
 # 🛠️ System Setup & Container Management Script
 
+> A shell script for setting up a Linux system and managing LXC containers.
+> It has been tested and made for Debian 11 (Bullseye).
+
+
+
+
+## 📖 Table of Contents
+
+- [📝 Overview](#-overview)
+- [🚀 Services](#-services)
+- [💻 Usage](#-usage)
+- [🔒 Safety and Security](#-safety-and-security)
+- [⚙️ Improvements](#️-improvements)
+- [⚠️ Disclaimer](#️-disclaimer)
+
 ## 📝 Overview
 
 This shell script is designed to set up and manage a Linux system running various services in LXC (Linux Containers) and Docker. It provides tools for system setup, creating new containers, and installing various packages. The script also configures Nginx, Certbot, WireGuard, and Docker.
@@ -43,6 +58,7 @@ The following improvements are recommended for this script:
 - Implement logging for debugging and auditing purposes. 📝
 - Use environment variables for sensitive data such as database passwords. 🗝️
 - Modularize the script into smaller scripts or functions for easier maintenance and testing. 🧩
+- Add support for other Linux distributions. 🐧
 
 ## ⚠️ Disclaimer
 
