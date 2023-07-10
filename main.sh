@@ -10,7 +10,7 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package is not installed... installing it"
     apt-get install ipcalc -y >/dev/null
     sleep 2
-    echo "ipcalc package installed"
+    echo "ipcalc package installed successfully"
 fi
 
 nginx_setup() {
