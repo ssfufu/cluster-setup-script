@@ -145,7 +145,7 @@ function nginx_ct_setup() {
 
 }
 
-function nginx_setup () {
+function nginx_setup() {
     echo ""
     echo ""
     echo "--------------------NGINX INSTALLATION--------------------"
@@ -155,6 +155,9 @@ function nginx_setup () {
     snap install --classic certbot
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
+
+    # Add server_tokens directive to nginx.conf
+    sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
 
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
