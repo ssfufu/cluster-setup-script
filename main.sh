@@ -34,6 +34,7 @@ nginx_setup() {
 
     # substitute placeholders with variable values in the template and create a new config file
     sed -e "s#server_name#server_name ${SERVER_NAME};#g" \
+        -e "s#proxy_set_header Host#proxy_set_header Host ${SERVER_NAME};#g" \
         -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
         -e "s#proxy_redirect#proxy_redirect ${PROXY_REDIRECT};#g" \
         -e "s#/etc/letsencrypt/live//#/etc/letsencrypt/live/${SERVER_NAME}/#g" \
@@ -74,6 +75,14 @@ vps_setup_single () {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
+    rm /etc/nginx/sites-available/default
+    rm /etc/nginx/sites-enabled/default
+    cp /root/cluster-setup-script/default_conf /etc/nginx/sites-available/default
+    ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+
+    certbot certonly --standalone -d ${domain_user} --email ${mail_user} --agree-tos --no-eff-email --noninteractive --force-renewal
+
+
     rm /etc/letsencrypt/options-ssl-nginx.conf > /dev/null
     mkdir -p /etc/letsencrypt/
     cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
@@ -82,8 +91,8 @@ vps_setup_single () {
     systemctl restart nginx.service
 
 
-    adduser $SUDO_USER lxd
-    su -c "lxd init" $SUDO_USER
+    adduser devops lxd
+    su -c "lxd init" devops
 
     lxc network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
     lxc network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
@@ -127,7 +136,7 @@ vps_setup_single () {
     echo ""
     echo ""
 
-    docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
+    docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
     nginx_setup "localhost" "8080" "monitor"
     docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
