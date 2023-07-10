@@ -13,7 +13,7 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package installed successfully"
 fi
 
-docker_setup () {
+function docker_setup () {
     echo ""
     echo ""
     echo "--------------------INSTALLING DOCKER--------------------"
@@ -52,7 +52,7 @@ docker_setup () {
     echo "--------------------DOCKER INSTALLED--------------------"
 }
 
-wireguard_setup () {
+function wireguard_setup () {
     echo "--------------------INSTALLING WIREGUARD--------------------"
 
     # detects if IPV6 is disabled and enables it
@@ -75,7 +75,7 @@ wireguard_setup () {
     echo "--------------------WIREGUARD ISNTALLED--------------------"
 }
 
-lxc_lxd_setup () {
+function lxc_lxd_setup () {
     echo ""
     echo ""
     echo "--------------------LXC/LXD INSTALLATION--------------------"
@@ -97,7 +97,7 @@ lxc_lxd_setup () {
     echo "--------------------LXC INSTALLED--------------------"    
 }
 
-nginx_ct_setup() {
+function nginx_ct_setup() {
     # Get parameters
     local CT_IP="$1"
     local CT_PORT="$2"
@@ -145,7 +145,7 @@ nginx_ct_setup() {
 
 }
 
-nginx_setup () {
+function nginx_setup () {
     echo ""
     echo ""
     echo "--------------------NGINX INSTALLATION--------------------"
@@ -173,7 +173,7 @@ nginx_setup () {
     echo "--------------------NGINX INSTALLED--------------------"
 }
 
-vps_setup_single () {
+function vps_setup_single () {
     # create a new user and add it to the sudo group
     adduser devops
     usermod -aG sudo devops
@@ -188,32 +188,37 @@ vps_setup_single () {
 
     read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
 
+    nginx_setup
+    lxc_lxd_setup
+    docker_setup
+
     echo ""
     echo ""
     echo "--------------------INSTALLING CADVISOR--------------------"
 
     docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_ct_setup "127.0.0.1" "8080" "monitor" $allowed_ips
+    nginx_ct_setup "127.0.0.1" "8080" "cadvisor" $allowed_ips
     docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""
     echo ""
     echo "--------------------CADVISOR INSTALLED--------------------"
 
-    echo ""
-    echo ""
+    wireguard_setup
 
     systemctl restart nginx.service
 
+    echo ""
+    echo ""
     echo -e "-------------SETUP DONE-------------\n"
-    echo "You now have a ready to use VPN (execute /home/devops/wireguard_script/wireguard-install.sh for creating, removing clients.)"
+    echo "You now have a ready to use VPN (execute /root/wireguard_script/wireguard-install.sh for creating, removing clients.)"
     echo "And also a cadvisor web pannel at cadvisor.$domain_user"
 
     echo ""
 
 }
 
-update_install_packages () {
+function update_install_packages () {
     container_name=$1
     shift
     packages=("$@")
@@ -226,7 +231,7 @@ update_install_packages () {
 
 }
 
-create_container () {
+function create_container () {
     # ask the user for the container name
     read -p "Enter the container name: " container_name
     echo "jenkins, prometheus, grafana, tolgee, appsmith, n8n, owncloud"
@@ -456,7 +461,7 @@ create_container () {
     exit 0
 }
 
-main () {
+function main () {
     echo ""
     echo "   ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
     echo "  ░░░░██████╗░██████╗███████╗██╗░░░██╗███╗░░██╗███████╗██████╗░░█████╗░██╗░░░░░░██████╗░░░"
