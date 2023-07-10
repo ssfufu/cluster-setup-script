@@ -296,18 +296,20 @@ create_container () {
         update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
 	    sleep 10
 
+        read -s "Please enter a password for the database: " db_password
+
 	    echo "Creating database..."
 	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE DATABASE tolgee;\""
 	    echo "Creating user..."
-	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD 'fedhubs';\""
+	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD '${db_password}';\""
     	echo "Granting privileges..."
 	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
+
 
 	    echo "Curl and shit..."
 	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
         sleep 5
-	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=fedhubs\nserver.port=8200" > /var/lib/lxc/$container_name/rootfs/root/application.properties
-
+	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=${db_password}\nserver.port=8200" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
 
 	    touch /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
 	    echo "[Unit]" > /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
@@ -372,7 +374,7 @@ create_container () {
         # Configure MariaDB
         echo -n "Please enter a owncloud database password: "
         read -s db_password
-        lxc-attach $container_name -- bash -c "mysql -e \"CREATE DATABASE owncloud; GRANT ALL ON owncloud.* to 'owncloud'@'localhost' IDENTIFIED BY '$db_password'; FLUSH PRIVILEGES;\""
+        lxc-attach $container_name -- bash -c "mysql -e \"CREATE DATABASE owncloud; GRANT ALL ON owncloud.* to 'owncloud'@'localhost' IDENTIFIED BY '${db_password}'; FLUSH PRIVILEGES;\""
 
         # Configure PHP
         lxc-attach $container_name -- bash -c "sed -i 's/post_max_size = .*/post_max_size = 2000M/' /etc/php/7.4/fpm/php.ini"
