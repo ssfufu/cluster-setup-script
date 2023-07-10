@@ -5,7 +5,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# checks if the ipcalc package is installed
+# checks if the ipcalc package is installed or not
 if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package is not installed... installing it"
     apt-get install ipcalc -y >/dev/null
