@@ -482,7 +482,15 @@ function create_container () {
         nginx_ct_setup $IP "80" $container_name $allowed_ips
         ;;
     "react")
-        update_install_packages $container_name nodejs npm
+        update_install_packages $container_name
+        # install nodejs latest version
+        lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
+        lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm"'
+        lxc-attach $container_name -- bash -c '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+
+        lxc-attach $container_name -- bash -c "nvm install --lts"
+        lxc-attach $container_name -- bash -c "nvm use --lts"
+
         sleep 10
         nginx_ct_setup $IP "3000" $container_name $allowed_ips
         lxc-attach $container_name -- bash -c "npm install -g pm2"
@@ -492,15 +500,19 @@ function create_container () {
         read -p "Is it a private repo? (y/n) " private_repo
         if [ "$private_repo" == "y" ]; then
             read -p "Enter the git username: " git_username
-            read -p "Enter the git password: " git_password
-            git_repo="https://$git_username:$git_password@${git_repo#https://}"
+            read -p "Enter the personal access token: " git_password
+            git_repo=$(echo $git_repo | sed 's/https:\/\///g')
+            git_repo="https://$git_username:$git_password@$git_repo"
         fi
+        repo_name=$(echo $git_repo | sed 's/.*\///g' | sed 's/.git//g')
 
         lxc-attach $container_name -- bash -c "mkdir /root/react"
         lxc-attach $container_name -- bash -c "cd /root/react && git clone $git_repo"
-        lxc-attach $container_name -- bash -c "cd /root/react && npm install && npm run build"
-        lxc-attach $container_name -- bash -c "cd /root/react && pm2 start npm --name \"react\" -- start"
+
+        lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && npm install && npm run build"
+        lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve build 3000 --name \"react\""
         lxc-attach $container_name -- bash -c "pm2 save"
+
         ;;
 	esac
 
