@@ -359,11 +359,11 @@ function create_container () {
 	"jenkins")
 	    update_install_packages $container_name openjdk-11-jdk
 
-    	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key |  tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
-	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt-get/sources.list.d/jenkins.list > /dev/null"
-    	lxc-attach $container_name -- apt-get update -y && apt-get install jenkins -y > /dev/null
-	    lxc-attach $container_name -- systemctl start jenkins &&  systemctl enable jenkins > /dev/null
-        nginx_ct_setup $IP "8080" $container_name
+    	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key |  tee /usr/share/keyrings/jenkins-keyring.asc"
+	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt/sources.list.d/jenkins.list"
+    	lxc-attach $container_name -- bash -c "apt-get update -y && apt-get install jenkins -y"
+	    lxc-attach $container_name -- bash -c "systemctl start jenkins &&  systemctl enable jenkins"
+        nginx_ct_setup $IP "8080" $container_name $allowed_ips
     	;;
 
 
@@ -397,7 +397,7 @@ function create_container () {
         lxc-attach $container_name -- systemctl daemon-reload
         lxc-attach $container_name -- systemctl start grafana-server
         lxc-attach $container_name -- systemctl enable grafana-server.service
-        nginx_ct_setup $IP "3000" $srv_name
+        nginx_ct_setup $IP "3000" $srv_name $allowed_ips
         ;;
 
 
@@ -426,7 +426,7 @@ function create_container () {
 	    sleep 2
 	    lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
         sleep 5
-        nginx_ct_setup $IP "8200" $srv_name
+        nginx_ct_setup $IP "8200" $srv_name $allowed_ips
 	    ;;
 
 	"appsmith")
@@ -442,7 +442,7 @@ function create_container () {
 
 	    docker-compose up -d
 	    sleep 2
-        nginx_ct_setup "localhost" "8000" "appsmith"
+        nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
 
 	    echo -e "Setup done\n"
         ;;
@@ -451,7 +451,7 @@ function create_container () {
         cd /root/cluster-setup-script
         docker-compose up -d
         sleep 5
-        nginx_ct_setup "localhost" "5678" $srv_name
+        nginx_ct_setup "localhost" "5678" $srv_name $allowed_ips
         ;;
     "owncloud")
         update_install_packages $container_name mariadb-server php-fpm php-mysql php-xml php-mbstring php-gd php-curl nginx php7.4-fpm php7.4-mysql php7.4-common php7.4-gd php7.4-json php7.4-curl php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl
@@ -477,11 +477,12 @@ function create_container () {
         lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
         lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
         lxc-attach $container_name -- bash -c "systemctl restart nginx"
-        nginx_ct_setup $IP "80" $srv_name
+        nginx_ct_setup $IP "80" $srv_name $allowed_ips
         ;;
     "react")
         update_install_packages $container_name nodejs npm
         sleep 10
+        nginx_ct_setup $IP "3000" $srv_name $allowed_ips
         ;;
 	esac
 
