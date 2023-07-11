@@ -241,8 +241,8 @@ function update_install_packages () {
 
 function create_container () {
     # ask the user for the container name
+    echo "jenkins, prometheus, grafana, tolgee, appsmith, n8n, owncloud, react"
     read -p "Enter the container name: " container_name
-    echo "jenkins, prometheus, grafana, tolgee, appsmith, n8n, owncloud"
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
     if [ -z "$container_name" ]; then
         echo "You must enter a container name"
@@ -449,6 +449,10 @@ function create_container () {
         lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
         lxc-attach $container_name -- bash -c "systemctl restart nginx"
         nginx_ct_setup $IP "80" $srv_name
+        ;;
+    "react")
+        update_install_packages $container_name nodejs npm
+        sleep 10
         ;;
 	esac
 
