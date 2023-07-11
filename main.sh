@@ -159,10 +159,14 @@ function nginx_setup() {
     ln -s /snap/bin/certbot /usr/bin/certbot
 
     # Add server_tokens directive to nginx.conf
-    # check if the directive is already added or not
-    if ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
-        sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
+    # check if server_tokens is already set, if it is commented, uncomment it
+    if grep -q "# server_tokens off;" /etc/nginx/nginx.conf; then
+        sed -i "s/# server_tokens off;/server_tokens off;/g" /etc/nginx/nginx.conf
+    # if it is not commented, add it
+    elif ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
+        sed -i "s/http {/http {\n    server_tokens off;/g" /etc/nginx/nginx.conf
     fi
+    
 
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
@@ -318,12 +322,36 @@ function create_container () {
         echo "lxc.net.0.ipv4.address = $IP/24" >> /var/lib/lxc/$container_name/config
         echo "lxc.net.0.ipv4.gateway = $gateway" >> /var/lib/lxc/$container_name/config
 
+        #take the /var/lib/lxc/<container_name>/rootfs/etc/systemd/resolved.conf file and add the DNS=
+        echo "Adding DNS to the container's resolved.conf file"
+
+        # checks if DNS= is commented or not
+        if grep -q "#DNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
+            sed -i "s/#DNS=/DNS=8.8.8.8/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+        else
+            echo "DNS=8.8.8.8" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+        fi
+
+        #same for dnsfallback=
+        if grep -q "#FallbackDNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
+            sed -i "s/#FallbackDNS=/FallbackDNS=8.8.4.4/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+        else
+            echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+        fi
+    
+
         #replaces the container's rootfs with the network file
         echo "Replacing container's rootfs with the network file"
         mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
     fi
 
     lxc-start -n $container_name
+    sleep 5
+    lxc-attach $container_name -- systemctl restart systemd-networkd
+    sleep 5
+    lxc-attach $container_name -- systemctl restart systemd-resolved
+    sleep 5
+
     echo "Installing required packages..."
 
     case $container_name in
