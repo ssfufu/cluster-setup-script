@@ -466,6 +466,108 @@ function create_container () {
     exit 0
 }
 
+function reset_server () {
+    # echo a warning in red color
+    echo -e "\e[31mWARNING: This will delete all containers, networks, nginx config files, environment files and wireguard\e[0m"
+    echo -e "\e[31m         It will also stop and remove all docker containers, images, volumes and networks\e[0m"
+    echo -e "\e[31m         Make sure to backup your system\e[0m"
+    echo ""
+    
+    echo -e "\e[31m         Are you sure you want to continue? (y/n)\e[0m"
+    read -p "" choice
+
+    if [ "$choice" != "y" ]; then
+        echo "Aborting..."
+        exit 1
+    fi
+
+    echo "Resetting server..."
+
+    echo "Deleting containers..."
+    # stop and destroy all lxc containers at once
+    lxc-ls -f | awk '{print $1}' | grep -v NAME | xargs -I {} lxc-stop -n {}
+    lxc-ls -f | awk '{print $1}' | grep -v NAME | xargs -I {} lxc-destroy -n {}
+
+    echo "Deleting networks..."
+    lxc network delete DMZ
+    lxc network delete DMZ2
+
+    echo "Deleting nginx config files..."
+    rm /etc/nginx/sites-available/cadvisor /etc/nginx/sites-enabled/cadvisor
+    rm /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins
+    rm /etc/nginx/sites-available/prometheus /etc/nginx/sites-enabled/prometheus
+    rm /etc/nginx/sites-available/grafana /etc/nginx/sites-enabled/grafana
+    rm /etc/nginx/sites-available/tolgee /etc/nginx/sites-enabled/tolgee
+    rm /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/appsmith
+    rm /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/n8n
+    rm /etc/nginx/sites-available/owncloud /etc/nginx/sites-enabled/owncloud
+
+    echo "Deleting environment files..."
+    rm /root/domain.txt
+    rm /root/mail.txt
+
+    echo "Deleting wireguard..."
+    systemctl stop wgquick@wg0.service
+    systemctl disable wgquick@wg0.service
+    apt-get remove -y wireguard wireguard-tools qrencode
+    rm -rf /etc/wireguard
+    rm -f /etc/sysctl.d/wg.conf
+    sysctl --system
+
+    echo "Deleting lxc/lxd/certbot..."
+    systemctl stop snap.lxd.daemon
+    systemctl disable snap.lxd.daemon
+    snap remove lxd
+    snap remove certbot
+    apt-get remove -y lxc snapd
+    rm -rf /var/lib/lxd
+    rm -rf /var/snap/lxd
+    rm -rf /etc/letsencrypt
+
+    echo "Deleting nginx..."
+    systemctl stop nginx.service
+    systemctl disable nginx.service
+    apt-get remove -y nginx
+    rm -rf /etc/nginx
+    rm -rf /var/www/html
+
+    echo "Deleting call docker containers..."
+    docker stop $(docker ps -a -q)
+    docker rm $(docker ps -a -q)
+
+    echo "Deleting call docker images..."
+    docker rmi $(docker images -a -q)
+
+    echo "Deleting call docker volumes..."
+    docker volume rm $(docker volume ls -q)
+
+    echo "Deleting call docker networks..."
+    docker network rm $(docker network ls -q)
+
+    echo "Deleting call docker system..."
+    docker system prune -a -f
+
+    echo "Deleting call docker compose..."
+    rm -rf /usr/local/bin/docker-compose
+    
+    echo "Deleting docker..."
+    systemctl stop docker.socket
+    systemctl stop docker.service
+    systemctl disable docker.socket
+    systemctl disable docker.service
+    apt-get remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils
+    rm -rf /var/lib/docker
+    rm -rf /etc/docker
+    rm -rf /etc/apt-get/keyrings/docker.gpg
+    rm -rf /etc/apt-get/sources.list.d/docker.list
+
+
+    echo "Reset done"
+    echo "You can now run the script again to setup the server"
+    exit 0
+
+}
+
 function main () {
     echo ""
     echo "   ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
