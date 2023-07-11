@@ -253,6 +253,8 @@ function create_container () {
         exit 1
     fi
 
+    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
+
     if [ -d "/var/lib/lxc/$container_name" ]; then
         echo "Container named $container_name already exists"
         exit 1
@@ -397,7 +399,7 @@ function create_container () {
         lxc-attach $container_name -- systemctl daemon-reload
         lxc-attach $container_name -- systemctl start grafana-server
         lxc-attach $container_name -- systemctl enable grafana-server.service
-        nginx_ct_setup $IP "3000" $srv_name $allowed_ips
+        nginx_ct_setup $IP "3000" $container_name $allowed_ips
         ;;
 
 
@@ -426,7 +428,7 @@ function create_container () {
 	    sleep 2
 	    lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
         sleep 5
-        nginx_ct_setup $IP "8200" $srv_name $allowed_ips
+        nginx_ct_setup $IP "8200" $container_name $allowed_ips
 	    ;;
 
 	"appsmith")
@@ -451,7 +453,7 @@ function create_container () {
         cd /root/cluster-setup-script
         docker-compose up -d
         sleep 5
-        nginx_ct_setup "localhost" "5678" $srv_name $allowed_ips
+        nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
         ;;
     "owncloud")
         update_install_packages $container_name mariadb-server php-fpm php-mysql php-xml php-mbstring php-gd php-curl nginx php7.4-fpm php7.4-mysql php7.4-common php7.4-gd php7.4-json php7.4-curl php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl
@@ -477,12 +479,12 @@ function create_container () {
         lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
         lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
         lxc-attach $container_name -- bash -c "systemctl restart nginx"
-        nginx_ct_setup $IP "80" $srv_name $allowed_ips
+        nginx_ct_setup $IP "80" $container_name $allowed_ips
         ;;
     "react")
         update_install_packages $container_name nodejs npm
         sleep 10
-        nginx_ct_setup $IP "3000" $srv_name $allowed_ips
+        nginx_ct_setup $IP "3000" $container_name $allowed_ips
         ;;
 	esac
 
