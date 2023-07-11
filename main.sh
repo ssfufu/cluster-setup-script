@@ -209,7 +209,7 @@ function vps_setup_single () {
     echo "--------------------INSTALLING CADVISOR--------------------"
 
     docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_ct_setup "127.0.0.1" "8080" "cadvisor" $allowed_ips
+    nginx_ct_setup "127.0.0.1" "8080" "monitor" $allowed_ips
     docker run -d -p 127.0.0.1:9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""
@@ -338,7 +338,11 @@ function create_container () {
         else
             echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
         fi
-    
+
+        lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+        sleep 1
+        lxc-attach $container_name -- systemctl restart systemd-resolved
+        sleep 1
 
         #replaces the container's rootfs with the network file
         echo "Replacing container's rootfs with the network file"
