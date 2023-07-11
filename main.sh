@@ -485,6 +485,22 @@ function create_container () {
         update_install_packages $container_name nodejs npm
         sleep 10
         nginx_ct_setup $IP "3000" $container_name $allowed_ips
+        lxc-attach $container_name -- bash -c "npm install -g pm2"
+        lxc-attach $container_name -- bash -c "pm2 startup"
+        echo "Installing react..."
+        read -p "Enter the git repo: " git_repo
+        read -p "Is it a private repo? (y/n) " private_repo
+        if [ "$private_repo" == "y" ]; then
+            read -p "Enter the git username: " git_username
+            read -p "Enter the git password: " git_password
+            git_repo="https://$git_username:$git_password@${git_repo#https://}"
+        fi
+
+        lxc-attach $container_name -- bash -c "mkdir /root/react"
+        lxc-attach $container_name -- bash -c "cd /root/react && git clone $git_repo"
+        lxc-attach $container_name -- bash -c "cd /root/react && npm install && npm run build"
+        lxc-attach $container_name -- bash -c "cd /root/react && pm2 start npm --name \"react\" -- start"
+        lxc-attach $container_name -- bash -c "pm2 save"
         ;;
 	esac
 
