@@ -159,7 +159,10 @@ function nginx_setup() {
     ln -s /snap/bin/certbot /usr/bin/certbot
 
     # Add server_tokens directive to nginx.conf
-    sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
+    # check if the directive is already added or not
+    if ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
+        sed -i '/http {/a \    server_tokens off;' /etc/nginx/nginx.conf
+    fi
 
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
@@ -358,11 +361,13 @@ function create_container () {
         update_install_packages $container_name
         wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
         echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
-        apt-get update -y > /dev/null
-        apt-get install grafana -y > /dev/null
-        systemctl daemon-reload
-        systemctl start grafana-server
-        systemctl enable grafana-server.service
+        lxc-attach $container_name -- apt-get update -y > /dev/null
+        sleep 5
+        lxc-attach $container_name -- apt-get install grafana -y > /dev/null
+        sleep 5
+        lxc-attach $container_name -- systemctl daemon-reload
+        lxc-attach $container_name -- systemctl start grafana-server
+        lxc-attach $container_name -- systemctl enable grafana-server.service
         nginx_ct_setup $IP "3000" $srv_name
         ;;
 
@@ -403,8 +408,8 @@ function create_container () {
     	curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
 
         # Change the ports
-        sed -i 's/80:80/8000:80/g' $PWD/docker-compose.yml
-        # sed -i 's/443:443/8443:443/g' $PWD/docker-compose.yml
+        sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
+        # sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
 
 	    docker-compose up -d
 	    sleep 2
@@ -474,6 +479,15 @@ function reset_server () {
     # stop and destroy all lxc containers at once
     lxc-ls -f | awk '{print $1}' | grep -v NAME | xargs -I {} lxc-stop -n {}
     lxc-ls -f | awk '{print $1}' | grep -v NAME | xargs -I {} lxc-destroy -n {}
+
+    # Make a for loop to remove all containers lxc that match the names in this script
+    for i in jenkins prometheus grafana tolgee owncloud; do
+        if [ -d "/var/lib/lxc/$i" ]; then
+            echo "Deleting container $i"
+            lxc-stop -n $i
+            lxc-destroy -n $i
+        fi
+    done
 
     echo "Deleting networks..."
     lxc network delete DMZ
