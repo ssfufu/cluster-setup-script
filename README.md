@@ -36,7 +36,6 @@ The script can set up containers for the following services:
 To use the script, run it as the root user. You will then be prompted to either set up the system or create a new container.
 
 ```bash
-chmod +x main.sh
 sudo ./main.sh
 ```
 
