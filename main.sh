@@ -339,17 +339,14 @@ function create_container () {
             echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
         fi
 
-        lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-        sleep 1
-        lxc-attach $container_name -- systemctl restart systemd-resolved
-        sleep 1
-
         #replaces the container's rootfs with the network file
         echo "Replacing container's rootfs with the network file"
         mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
     fi
 
     lxc-start -n $container_name
+    lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    sleep 1
     sleep 5
     lxc-attach $container_name -- systemctl restart systemd-networkd
     sleep 5
