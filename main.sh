@@ -20,11 +20,11 @@ function docker_setup () {
     echo ""
     echo ""
 
-    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
+    for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done > /dev/null
 
-    apt-get update -y
+    apt-get update -y > /dev/null
     sleep 3
-    apt-get install ca-certificates curl gnupg -y
+    apt-get install ca-certificates curl gnupg -y > /dev/null
 
     install -m 0755 -d /etc/apt-get/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt-get/keyrings/docker.gpg
@@ -35,17 +35,18 @@ function docker_setup () {
         "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
         tee /etc/apt-get/sources.list.d/docker.list > /dev/null
 
-    apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils -y
+    apt-get update -y > /dev/null
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils -y > /dev/null
 
     groupadd docker
     usermod -aG docker devops
 
-    systemctl restart docker.socket
-    systemctl restart docker.service
+    systemctl enable docker.service > /dev/null
+    systemctl enable containerd.service > /dev/null
 
-    systemctl enable docker.service
-    systemctl enable containerd.service
+    systemctl restart docker.socket > /dev/null
+    systemctl restart docker.service > /dev/null
+
 
     echo ""
     echo ""
@@ -79,11 +80,11 @@ function lxc_lxd_setup () {
     echo ""
     echo ""
     echo "--------------------LXC/LXD INSTALLATION--------------------"
-    apt-get install lxc snapd -y
+    apt-get install lxc snapd -y > /dev/null
     sleep 2
-    snap install core
+    snap install core > /dev/null
     sleep 2
-    snap install lxd
+    snap install lxd > /dev/null
     sleep 2
 
     adduser devops lxd
@@ -141,6 +142,7 @@ function nginx_ct_setup() {
     systemctl stop nginx
 
     certbot certonly --standalone -d ${SERVER_NAME} --email ${MAIL} --agree-tos --no-eff-email --noninteractive --force-renewal
+    
     systemctl start nginx
 
 }
@@ -149,10 +151,10 @@ function nginx_setup() {
     echo ""
     echo ""
     echo "--------------------NGINX INSTALLATION--------------------"
-    apt-get install nginx -y
+    apt-get install nginx -y > /dev/null
     sleep 1
     systemctl enable nginx && systemctl start nginx
-    snap install --classic certbot
+    snap install --classic certbot > /dev/null
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
@@ -201,7 +203,7 @@ function vps_setup_single () {
 
     docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
     nginx_ct_setup "127.0.0.1" "8080" "cadvisor" $allowed_ips
-    docker run -d -p 9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
+    docker run -d -p 127.0.0.1:9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""
     echo ""
@@ -226,10 +228,10 @@ function update_install_packages () {
     shift
     packages=("$@")
 
-    lxc-attach $container_name -- bash -c "apt-get update -y && apt-get install nano wget software-properties-common ca-certificates curl gnupg git -y"
+    lxc-attach $container_name -- bash -c "apt-get update -y && apt-get install nano wget software-properties-common ca-certificates curl gnupg git -y" > /dev/null
     sleep 20
     for i in "${packages[@]}"; do
-        lxc-attach $container_name -- apt-get install $i -y
+        lxc-attach $container_name -- apt-get install $i -y > /dev/null
     done
 
 }
@@ -327,8 +329,8 @@ function create_container () {
 
     	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key |  tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null"
 	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt-get/sources.list.d/jenkins.list > /dev/null"
-    	lxc-attach $container_name -- apt-get update -y && apt-get install jenkins -y
-	    lxc-attach $container_name -- systemctl start jenkins &&  systemctl enable jenkins
+    	lxc-attach $container_name -- apt-get update -y && apt-get install jenkins -y > /dev/null
+	    lxc-attach $container_name -- systemctl start jenkins &&  systemctl enable jenkins > /dev/null
         nginx_ct_setup $IP "8080" $container_name
     	;;
 
@@ -356,8 +358,8 @@ function create_container () {
         update_install_packages $container_name
         wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
         echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
-        apt-get update -y
-        apt-get install grafana -y
+        apt-get update -y > /dev/null
+        apt-get install grafana -y > /dev/null
         systemctl daemon-reload
         systemctl start grafana-server
         systemctl enable grafana-server.service
@@ -382,22 +384,7 @@ function create_container () {
         sleep 5
 	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=${db_password}\nserver.port=8200" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
 
-	    touch /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "[Unit]" > /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "Description=Tolgee Service" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "After=network.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "[Service]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "User=root" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "WorkingDirectory=/root/" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "ExecStart=/usr/bin/java -Dtolgee.postgres-autostart.enabled=false -jar latest-release.jar" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "SuccessExitStatus=143" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "TimeoutStopSec=10" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "Restart=on-failure" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "RestartSec=5" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "[Install]" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
-	    echo "WantedBy=multi-user.target" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/system/tolgee.service
+        cp /root/cluster-setup-script/tolgee.service /var/lib/lxc/${container_name}/rootfs/etc/systemd/system/tolgee.service
 
 	    lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
         sleep 2
@@ -590,6 +577,8 @@ function main () {
     while [[ $choice_state == false ]]; do
         echo "    - Setup your system [1]"
         echo "    - Setup a new container [2]"
+        echo "    - Reset the server [3]"
+
 	    echo ""
         read -p "What would you like to do: " user_choice
         case $user_choice in
@@ -601,6 +590,10 @@ function main () {
             	create_container
             	choice_state=true
             	;;
+            3)
+                	reset_server
+                	choice_state=true
+                	;;
             *)
             	echo "Wrong input"
             	;;
