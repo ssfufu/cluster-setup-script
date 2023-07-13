@@ -14,6 +14,7 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
 fi
 
 function backup_server () {
+
     echo "--------------------BACKUP SERVER--------------------"
     echo "This will backup the server and containers to a remote server every hour"
 
@@ -28,16 +29,24 @@ function backup_server () {
     read -p "Enter the remote server's backup retention (in days): " remote_retention
     read -p "Enter the remote server's backup compression (y/n): " remote_compression
     read -p "Enter the remote server's backup encryption (y/n): " remote_encryption
+    read -p "Do you also want to transfer the backups to an FTP server? (y/n): " ftp_transfer
 
-    # Generate SSH key for passwordless authentication
+    if [ "$ftp_transfer" = "y" ]; then
+        read -p "Enter the FTP server's IP address: " ftp_ip
+        read -p "Enter the FTP server's username: " ftp_username
+        read -p "Enter the FTP server's password: " ftp_password
+        read -p "Enter the FTP server's backup directory: " ftp_dir
+    fi
+
+    # Generate SSH key pair for passwordless authentication
     ssh-keygen -t rsa -b 4096 -f "/home/${USER}/.ssh/${remote_name}_rsa" -N ""
 
     # Print instructions to copy the public key to the remote server
-    echo "To set up passwordless authentication, copy the public key to the remote server with this command (this will ask for the remote server's password):"
+    echo "To set up passwordless authentication, copy the public key to the remote server with this command:"
     echo "ssh-copy-id -i /home/${USER}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip} -p ${remote_port}"
 
     # Generate backup script
-    backup_script="backup_${remote_name}.sh"
+    backup_script="/home/${USER}/backup_${remote_name}.sh"
     echo "#!/bin/bash" > "$backup_script"
 
     # Write commands to perform backup
@@ -46,6 +55,9 @@ function backup_server () {
     if [ "$remote_compression" = "y" ]; then
         echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
         echo "  rsync -avz -e \"ssh -i /home/${USER}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+        if [ "$ftp_transfer" = "y" ]; then
+            echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/" >> "$backup_script"
+        fi
     else
         echo "  rsync -avz -e \"ssh -i /home/${USER}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
     fi
@@ -58,6 +70,12 @@ function backup_server () {
     chmod +x "$backup_script"
 
     echo "Backup script generated: $backup_script"
+
+    # Add a cron job to run the backup script
+    (crontab -l 2>/dev/null; echo "0 */${remote_freq} * * * ${backup_script}") | crontab -
+
+    echo "Cron job added to run the backup script every ${remote_freq} hours"
+
 
 }
 
