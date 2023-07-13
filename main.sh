@@ -13,6 +13,54 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package installed successfully"
 fi
 
+function backup_server () {
+    echo "--------------------BACKUP SERVER--------------------"
+    echo "This will backup the server and containers to a remote server every hour"
+
+    # Get user inputs
+    read -p "Enter the remote server's IP address: " remote_ip
+    read -p "Enter the remote server's username: " remote_username
+    read -p "Enter the remote server's port: " remote_port
+    read -p "Enter the remote server's backup directory: " remote_dir
+    read -p "Enter the remote server's backup name: " remote_name
+    read -p "Enter the remote server's backup extension: " remote_ext
+    read -p "Enter the remote server's backup frequency (in hours): " remote_freq
+    read -p "Enter the remote server's backup retention (in days): " remote_retention
+    read -p "Enter the remote server's backup compression (y/n): " remote_compression
+    read -p "Enter the remote server's backup encryption (y/n): " remote_encryption
+
+    # Generate SSH key for passwordless authentication
+    ssh-keygen -t rsa -b 4096 -f "/home/${USER}/.ssh/${remote_name}_rsa" -N ""
+
+    # Print instructions to copy the public key to the remote server
+    echo "To set up passwordless authentication, copy the public key to the remote server with this command (this will ask for the remote server's password):"
+    echo "ssh-copy-id -i /home/${USER}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip} -p ${remote_port}"
+
+    # Generate backup script
+    backup_script="backup_${remote_name}.sh"
+    echo "#!/bin/bash" > "$backup_script"
+
+    # Write commands to perform backup
+    echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/var/lib/lxd\" \"/var/lib/docker\")" >> "$backup_script"
+    echo "for dir in \"\${dirs_to_backup[@]}\"; do" >> "$backup_script"
+    if [ "$remote_compression" = "y" ]; then
+        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
+        echo "  rsync -avz -e \"ssh -i /home/${USER}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+    else
+        echo "  rsync -avz -e \"ssh -i /home/${USER}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+    fi
+    echo "done" >> "$backup_script"
+
+    # Add backup retention logic
+    echo "find \"${remote_dir}\" -name \"${remote_name}*${remote_ext}\" -type f -mtime +${remote_retention} -delete" >> "$backup_script"
+
+    # Set execute permission on the script
+    chmod +x "$backup_script"
+
+    echo "Backup script generated: $backup_script"
+
+}
+
 function docker_setup () {
     echo ""
     echo ""
@@ -510,8 +558,20 @@ function create_container () {
         lxc-attach $container_name -- bash -c "cd /root/react && git clone $git_repo"
 
         lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && npm install && npm run build"
-        lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve build 3000 --name \"react\""
+        # check if the build folder is build or dist and store it in a variable
+        if [ -d "/root/react/${repo_name}/build" ]; then
+            build_folder="build"
+        elif [ -d "/root/react/${repo_name}/dist" ]; then
+            build_folder="dist"
+        else
+            echo "Build folder not found"
+            exit 1
+        fi
+
+        lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve ${build_folder} 3000 --name react"
         lxc-attach $container_name -- bash -c "pm2 save"
+        lxc-attach $container_name -- bash -c "pm2 startup"
+        lxc-attach $container_name -- bash -c "systemctl restart pm2-root"
 
         ;;
 	esac
@@ -521,6 +581,8 @@ function create_container () {
 
     exit 0
 }
+
+
 
 function reset_server () {
     # echo a warning in red color
