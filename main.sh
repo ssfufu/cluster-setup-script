@@ -310,21 +310,24 @@ function update_install_packages () {
 }
 
 function create_container () {
-    # ask the user for the container name
-    echo "jenkins, prometheus, grafana, tolgee, appsmith, n8n, owncloud, react"
-    read -p "Enter the container name: " container_name
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
+    echo "jenkins, prometheus, grafana, tolgee, appsmith, n8n, owncloud, nextcloud, react"
+
+    read -p "Enter the container name: " container_name
     if [ -z "$container_name" ]; then
         echo "You must enter a container name"
         exit 1
     fi
-
-    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
-
+    if ! echo "jenkins prometheus grafana tolgee appsmith n8n owncloud nextcloud react" | grep -w "$container_name" >/dev/null; then
+        echo "Container name not in the list"
+        exit 1
+    fi
     if [ -d "/var/lib/lxc/$container_name" ]; then
         echo "Container named $container_name already exists"
         exit 1
     fi
+
+    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
 
     # asks the user for the network interface the container will use, list the interfaces to choose from
     echo -e "\nThe following interfaces are available:"
