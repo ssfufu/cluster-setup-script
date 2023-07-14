@@ -547,6 +547,21 @@ function create_container () {
         lxc-attach $container_name -- bash -c "systemctl restart nginx"
         nginx_ct_setup $IP "80" $container_name $allowed_ips
         ;;
+    "nextcloud")
+        update_install_packages $container_name apache2 libapache2-mod-php mariadb-client unzip wget php-gd php-json php-mysql php-curl php-mbstring php-intl php-imagick php-xml php-zip
+        sleep 10
+        _domain="$(cat /root/domain.txt)"
+        lxc-attach $container_name -- bash -c "wget https://download.nextcloud.com/server/releases/latest.zip && unzip latest.zip -d /var/www/"
+        lxc-attach $container_name -- bash -c "chown -R www-data:www-data /var/www/nextcloud/"
+        lxc-attach $container_name -- bash -c "chmod -R 755 /var/www/nextcloud/"
+        sed -i "s/ServerName.*/ServerName ${container_name}.${_domain}/g" /root/cluster-setup-script/nextcloud.conf
+        cp /root/cluster-setup-script/nextcloud.conf /var/lib/lxc/$container_name/rootfs/etc/apache2/sites-available/nextcloud.conf
+        lxc-attach $container_name -- bash -c "a2ensite nextcloud"
+        lxc-attach $container_name -- bash -c "a2enmod rewrite headers env dir mime"
+        nginx_ct_setup $IP "80" $container_name $allowed_ips
+
+
+        ;;
     "react")
         update_install_packages $container_name
         # install nodejs latest version
