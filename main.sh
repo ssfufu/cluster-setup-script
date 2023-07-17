@@ -224,16 +224,9 @@ function nginx_setup() {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
 
-    # Add server_tokens directive to nginx.conf
-    # check if server_tokens is already set, if it is commented, uncomment it
-    if grep -q "# server_tokens off;" /etc/nginx/nginx.conf; then
-        sed -i "s/# server_tokens off;/server_tokens off;/g" /etc/nginx/nginx.conf
-    # if it is not commented, add it
-    elif ! grep -q "server_tokens off;" /etc/nginx/nginx.conf; then
-        sed -i "s/http {/http {\n    server_tokens off;/g" /etc/nginx/nginx.conf
-    fi
+    rm /etc/nginx/nginx.conf
+    cp /root/cluster-setup-script/nginx.conf /etc/nginx/nginx.conf
     
-
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
     cp /root/cluster-setup-script/default_conf /etc/nginx/sites-available/default
@@ -244,6 +237,18 @@ function nginx_setup() {
     cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
     openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
     chmod 644 /etc/letsencrypt/ssl-dhparams.pem
+
+    cd /root/
+    curl -LO "https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz"
+    tar -xzf "nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz"
+    chmod +x nginx-prometheus-exporter
+    mv nginx-prometheus-exporter /usr/local/bin/nginx-prometheus-exporter
+
+    cp /root/cluster-setup-script/nginx-prometheus-exporter.service /etc/systemd/system/nginx-prometheus-exporter.service
+    systemctl daemon-reload
+    systemctl enable nginx-prometheus-exporter.service
+    systemctl start nginx-prometheus-exporter.service
+
     systemctl restart nginx.service
 
     echo ""
@@ -274,9 +279,9 @@ function vps_setup_single () {
     echo ""
     echo "--------------------INSTALLING CADVISOR--------------------"
 
-    docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8080:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_ct_setup "127.0.0.1" "8080" "monitor" $allowed_ips
-    docker run -d -p 127.0.0.1:9100:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
+    docker run --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
+    nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $allowed_ips
+    docker run -d -p 127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""
     echo ""
@@ -327,7 +332,7 @@ function create_container () {
         exit 1
     fi
 
-    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
+    read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at ifconfig.me" allowed_ips
 
     # asks the user for the network interface the container will use, list the interfaces to choose from
     echo -e "\nThe following interfaces are available:"
@@ -387,7 +392,7 @@ function create_container () {
         echo "Creating container..."
         lxc-create -t download -n $container_name -- -d debian -r bullseye -a amd64 > /dev/null
 
-        # updates the contaier's config file
+        # updates the container's config file
         echo "Updating container's config file"
         sed -i "s/lxc.net.0.link = lxcbr0/lxc.net.0.link = $interface/g" /var/lib/lxc/$container_name/config
         echo "lxc.net.0.ipv4.address = $IP/24" >> /var/lib/lxc/$container_name/config
@@ -416,8 +421,14 @@ function create_container () {
     fi
 
     lxc-start -n $container_name
+    lxc-attach $container_name -- hostnamectl set-hostname $container_name
+    sed -i '/127.0.0.1/c\127.0.0.1 '${container_name} /var/lib/lxc/$container_name/rootfs/etc/hosts
+    lxc-stop -n $container_name
+    lxc-start -n $container_name
+
+    sleep 5
+
     lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-    sleep 1
     sleep 5
     lxc-attach $container_name -- systemctl restart systemd-networkd
     sleep 5
@@ -427,38 +438,27 @@ function create_container () {
     echo "Installing required packages..."
 
     case $container_name in
-	"jenkins")
-	    update_install_packages $container_name openjdk-11-jdk
-
-    	lxc-attach $container_name -- bash -c "curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key |  tee /usr/share/keyrings/jenkins-keyring.asc"
-	    lxc-attach $container_name -- bash -c "echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ |  tee /etc/apt/sources.list.d/jenkins.list"
-    	lxc-attach $container_name -- bash -c "apt-get update -y && apt-get install jenkins -y"
-	    lxc-attach $container_name -- bash -c "systemctl start jenkins &&  systemctl enable jenkins"
-        nginx_ct_setup $IP "8080" $container_name $allowed_ips
-    	;;
-
-
-	"prometheus")
-	    update_install_packages $container_name prometheus
-	    file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
+    "monitoring")
+        update_install_packages $container_name prometheus
+        file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
 	    host_ip=$(ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//')
 
 	    # Add the content to the file
 	    echo "" >> $file_name
 	    echo "  - job_name: node" >> $file_name
-	    echo "    # If prometheus-node-exporter is installed, grab stats about the local" >> $file_name
-	    echo "    # machine by default." >> $file_name
     	echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$host_ip:9100']" >> $file_name
+	    echo "      - targets: ['$host_ip:9111']" >> $file_name
+
 	    echo "" >> $file_name
-	    echo "  - job_name: 'jenkins'" >> $file_name
+	    echo "  - job_name: 'nginx'" >> $file_name
 	    echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['10.128.151.10:8080']" >> $file_name
-	    echo "    metrics_path: '/prometheus/'" >> $file_name
-	    ;;
-    
-    "grafana")
-        update_install_packages $container_name
+	    echo "      - targets: ['$host_ip:9113']" >> $file_name
+
+        echo "" >> $file_name
+        echo "  - job_name: 'cadvisor'" >> $file_name
+        echo "    static_configs:" >> $file_name
+        echo "      - targets: ['$host_ip:8899']" >> $file_name
+
         wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
         echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
         lxc-attach $container_name -- apt-get update -y > /dev/null
@@ -468,6 +468,17 @@ function create_container () {
         lxc-attach $container_name -- systemctl daemon-reload
         lxc-attach $container_name -- systemctl start grafana-server
         lxc-attach $container_name -- systemctl enable grafana-server.service
+
+        wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
+        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
+        lxc-attach $container_name -- apt-get update -y > /dev/null
+        sleep 5
+        lxc-attach $container_name -- apt-get install grafana -y > /dev/null
+        sleep 5
+        lxc-attach $container_name -- systemctl daemon-reload
+        lxc-attach $container_name -- systemctl start grafana-server
+        lxc-attach $container_name -- systemctl enable grafana-server.service
+
         nginx_ct_setup $IP "3000" $container_name $allowed_ips
         ;;
 
@@ -553,6 +564,13 @@ function create_container () {
     "nextcloud")
         update_install_packages $container_name apache2 libapache2-mod-php mariadb-client unzip wget php-gd php-json php-mysql php-curl php-mbstring php-intl php-imagick php-xml php-zip
         sleep 10
+        lxc-attach $container_name -- bash -c "sudo wget https://packages.sury.org/php/apt.gpg -O /etc/apt/trusted.gpg.d/php.gpg"
+        lxc-attach $container_name -- bash -c "echo 'deb https://packages.sury.org/php/ $(lsb_release -sc) main' > /etc/apt/sources.list.d/php.list"
+        lxc-attach $container_name -- apt-get update -y
+        # install php 8.2
+        lxc-attach $container_name -- bash -c "apt-get install php8.2 php8.2-cli php8.2-common php8.2-curl php8.2-mbstring php8.2-mysql php8.2-xml php8.2-zip php8.2-intl php8.2-imagick -y"
+        lxc-attach $container_name -- bash -c "a2enmod php8.2 && a2dismod php7.4"
+        lxc-attach $container_name -- bash -c "systemctl restart apache2"
         _domain="$(cat /root/domain.txt)"
         lxc-attach $container_name -- bash -c "wget https://download.nextcloud.com/server/releases/latest.zip && unzip latest.zip -d /var/www/"
         lxc-attach $container_name -- bash -c "chown -R www-data:www-data /var/www/nextcloud/"
@@ -561,10 +579,13 @@ function create_container () {
         cp /root/cluster-setup-script/nextcloud.conf /var/lib/lxc/$container_name/rootfs/etc/apache2/sites-available/nextcloud.conf
         lxc-attach $container_name -- bash -c "a2ensite nextcloud"
         lxc-attach $container_name -- bash -c "a2enmod rewrite headers env dir mime"
+        lxc-attach $container_name -- bash -c "a2dissite 000-default"
+        echo "ServerName ${container_name}" >> /var/lib/lxc/$container_name/rootfs/etc/apache2/apache2.conf
+        lxc-attach $container_name -- bash -c "systemctl restart apache2"
+
         nginx_ct_setup $IP "80" $container_name $allowed_ips
-
-
         ;;
+        
     "react")
         update_install_packages $container_name
         # install nodejs latest version
@@ -617,8 +638,6 @@ function create_container () {
 
     exit 0
 }
-
-
 
 function reset_server () {
     # echo a warning in red color
@@ -677,53 +696,9 @@ function reset_server () {
     rm -f /etc/sysctl.d/wg.conf
     sysctl --system
 
-    echo "Deleting lxc/lxd/certbot..."
-    systemctl stop snap.lxd.daemon
-    systemctl disable snap.lxd.daemon
-    snap remove lxd
-    snap remove certbot
-    apt-get remove -y lxc snapd
-    rm -rf /var/lib/lxd
-    rm -rf /var/snap/lxd
-    rm -rf /etc/letsencrypt
-
-    echo "Deleting nginx..."
-    systemctl stop nginx.service
-    systemctl disable nginx.service
-    apt-get remove -y nginx
-    rm -rf /etc/nginx
-    rm -rf /var/www/html
-
     echo "Deleting call docker containers..."
     docker stop $(docker ps -a -q)
     docker rm $(docker ps -a -q)
-
-    echo "Deleting call docker images..."
-    docker rmi $(docker images -a -q)
-
-    echo "Deleting call docker volumes..."
-    docker volume rm $(docker volume ls -q)
-
-    echo "Deleting call docker networks..."
-    docker network rm $(docker network ls -q)
-
-    echo "Deleting call docker system..."
-    docker system prune -a -f
-
-    echo "Deleting call docker compose..."
-    rm -rf /usr/local/bin/docker-compose
-    
-    echo "Deleting docker..."
-    systemctl stop docker.socket
-    systemctl stop docker.service
-    systemctl disable docker.socket
-    systemctl disable docker.service
-    apt-get remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin debootstrap bridge-utils
-    rm -rf /var/lib/docker
-    rm -rf /etc/docker
-    rm -rf /etc/apt-get/keyrings/docker.gpg
-    rm -rf /etc/apt-get/sources.list.d/docker.list
-
 
     echo "Reset done"
     echo "You can now run the script again to setup the server"
