@@ -181,6 +181,7 @@ function nginx_ct_setup() {
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
     local PROXY_PASS="http://${CT_IP}:${CT_PORT}"
     local PROXY_REDIRECT="http://${CT_IP}:${CT_PORT} https://${SERVER_NAME}"
+    local dir_path="/etc/letsencrypt/live/${SERVER_NAME}"
 
     # deletes the file if already exists
     rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enable/$CT_NAME
@@ -204,12 +205,17 @@ function nginx_ct_setup() {
 
     # create a symlink to the sites-enabled directory
     ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/
-    
-    systemctl stop nginx
 
-    certbot certonly --standalone -d ${SERVER_NAME} --email ${MAIL} --agree-tos --no-eff-email --noninteractive --force-renewal
+    if [ -d "$dir_path" ]; then
+        echo "There already is a certificate for that."
+    else
+        systemctl stop nginx
+
+        certbot certonly --standalone -d ${SERVER_NAME} --email ${MAIL} --agree-tos --no-eff-email --noninteractive --force-renewal
+        
+        systemctl start nginx
+    fi
     
-    systemctl start nginx
 
 }
 
