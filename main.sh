@@ -353,10 +353,24 @@ function create_container () {
         exit 1
     fi
 
+    range_start=2
+    range_end=254
+    # Get the subnet
+    subnet=$(echo "$gateway" | cut -d"." -f1-3)
 
-    read -p "Enter an IP address for the network $interface ($gateway): " IP
+    # Loop through the IP addresses
+    for i in $(seq $range_start $range_end); do
+        IP="$subnet.$i"
+        # Check if the IP address is in use
+        if ! ping -c 1 -W 1 "$IP" > /dev/null 2>&1; then
+            echo "Found available IP address: $IP"
+            break
+        fi
+    done
+
+    # Check if we found an IP address
     if [ -z "$IP" ]; then
-        echo "You must enter an IP address"
+        echo "No available IP addresses found in the range $subnet.$range_start to $subnet.$range_end"
         exit 1
     fi
 
@@ -364,61 +378,51 @@ function create_container () {
     srv_name="${container_name}.${dom}"
 
     echo ""
+    echo "--------------------CREATING CONTAINER--------------------"
+    # creates a file at /var/lib/lxc/<container_name>/rootfs/etc/systemd/network/10-eth0.network
+    touch /tmp/10-eth0.network
+    net_file="/tmp/10-eth0.network"
 
-    # checks if the IP is on the the same network as the gateway (like if the network is 10.128.151.x, the IP must be 10.128.151.x)
-    if ! ipcalc -c "$IP" "$gateway" >/dev/null; then
-        echo "IP address is not on the same network as the gateway"
-        exit 1
-    fi
+    echo "Creating network file..."
+    echo "[Match]" >> $net_file
+    echo "Name=eth0" >> $net_file
+    echo "" >> $net_file
+    echo "[Network]" >> $net_file
+    echo "Address=$IP/24" >> $net_file
+    echo "Gateway=$gateway" >> $net_file
+    echo "DNS=8.8.8.8" >> $net_file
 
-    # makes a loop to check if the IP is already allocated and reask the user for a new IP
-    if ping -c 1 "$IP" >/dev/null; then
-        echo "IP address is already allocated"
+    lxc-create -t download -n $container_name -- -d debian -r bullseye -a amd64 > /dev/null
+    sleep 5
+    echo "--------------------CONTAINER CREATED--------------------"
+    echo ""
+    echo "--------------------STARTING CONTAINER--------------------"
+    # updates the container's config file
+    echo "Updating container's config file"
+    sed -i "s/lxc.net.0.link = lxcbr0/lxc.net.0.link = $interface/g" /var/lib/lxc/$container_name/config
+    echo "lxc.net.0.ipv4.address = $IP/24" >> /var/lib/lxc/$container_name/config
+    echo "lxc.net.0.ipv4.gateway = $gateway" >> /var/lib/lxc/$container_name/config
+
+    #take the /var/lib/lxc/<container_name>/rootfs/etc/systemd/resolved.conf file and add the DNS=
+    echo "Adding DNS to the container's resolved.conf file"
+
+    # checks if DNS= is commented or not
+    if grep -q "#DNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
+        sed -i "s/#DNS=/DNS=8.8.8.8/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
     else
-        # creates a file at /var/lib/lxc/<container_name>/rootfs/etc/systemd/network/10-eth0.network
-        touch /tmp/10-eth0.network
-        net_file="/tmp/10-eth0.network"
-
-        echo "Creating network file..."
-        echo "[Match]" >> $net_file
-        echo "Name=eth0" >> $net_file
-        echo "" >> $net_file
-        echo "[Network]" >> $net_file
-        echo "Address=$IP/24" >> $net_file
-        echo "Gateway=$gateway" >> $net_file
-        echo "DNS=8.8.8.8" >> $net_file
-
-        # creates the container
-        echo "Creating container..."
-        lxc-create -t download -n $container_name -- -d debian -r bullseye -a amd64 > /dev/null
-
-        # updates the container's config file
-        echo "Updating container's config file"
-        sed -i "s/lxc.net.0.link = lxcbr0/lxc.net.0.link = $interface/g" /var/lib/lxc/$container_name/config
-        echo "lxc.net.0.ipv4.address = $IP/24" >> /var/lib/lxc/$container_name/config
-        echo "lxc.net.0.ipv4.gateway = $gateway" >> /var/lib/lxc/$container_name/config
-
-        #take the /var/lib/lxc/<container_name>/rootfs/etc/systemd/resolved.conf file and add the DNS=
-        echo "Adding DNS to the container's resolved.conf file"
-
-        # checks if DNS= is commented or not
-        if grep -q "#DNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
-            sed -i "s/#DNS=/DNS=8.8.8.8/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
-        else
-            echo "DNS=8.8.8.8" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
-        fi
-
-        #same for dnsfallback=
-        if grep -q "#FallbackDNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
-            sed -i "s/#FallbackDNS=/FallbackDNS=8.8.4.4/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
-        else
-            echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
-        fi
-
-        #replaces the container's rootfs with the network file
-        echo "Replacing container's rootfs with the network file"
-        mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
+        echo "DNS=8.8.8.8" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
     fi
+
+    #same for dnsfallback=
+    if grep -q "#FallbackDNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
+        sed -i "s/#FallbackDNS=/FallbackDNS=8.8.4.4/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+    else
+        echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+    fi
+
+    #replaces the container's rootfs with the network file
+    echo "Replacing container's rootfs with the network file"
+    mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
 
     lxc-start -n $container_name
     lxc-attach $container_name -- hostnamectl set-hostname $container_name
@@ -435,7 +439,10 @@ function create_container () {
     lxc-attach $container_name -- systemctl restart systemd-resolved
     sleep 5
 
-    echo "Installing required packages..."
+    echo "--------------------CONTAINER STARTED--------------------"
+
+    echo ""
+    echo "--------------------SETTING UP THE CONTAINER--------------------"
 
     case $container_name in
     "monitoring")
@@ -636,6 +643,39 @@ function create_container () {
     sleep 3
     lxc-info -n $container_name
 
+    echo ""
+    echo "--------------------CONTAINER SETUP DONE--------------------"
+    echo ""
+    echo "The container's IP address is: $IP"
+    echo "The container's hostname is: $container_name"
+    echo "The container's domain name is: $srv_name"
+    echo "The container's ports are:"
+    case $container_name in
+    "monitoring")
+        echo "Prometheus: $IP:9090"
+        echo "Grafana: $IP:3000"
+        echo "Cadvisor: $IP:8899"
+        ;;
+    "tolgee")
+        echo "Tolgee: $IP:8200"
+        ;;
+    "appsmith")
+        echo "Appsmith: $IP:8000"
+        ;;
+    "n8n")
+        echo "n8n: $IP:5678"
+        ;;
+    "owncloud")
+        echo "owncloud: $IP:80"
+        ;;
+    "nextcloud")
+        echo "nextcloud: $IP:80"
+        ;;
+    "react")
+        echo "react: $IP:3000"
+        ;;
+    esac
+    
     exit 0
 }
 
