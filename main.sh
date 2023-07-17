@@ -452,7 +452,7 @@ function create_container () {
 	    echo "" >> $file_name
 	    echo "  - job_name: 'nginx'" >> $file_name
 	    echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$host_ip:9113']" >> $file_name
+	    echo "      - targets: ['$host_ip:8888']" >> $file_name
 
         echo "" >> $file_name
         echo "  - job_name: 'cadvisor'" >> $file_name
