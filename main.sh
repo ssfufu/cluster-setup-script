@@ -714,6 +714,16 @@ function reset_server () {
     lxc network delete DMZ
     lxc network delete DMZ2
 
+    # Delete lxd and lxc
+    echo "Deleting lxd and lxc..."
+    apt-get remove -y lxc
+    snap remove lxd
+
+    rm -rf /var/lib/lxd
+    rm -rf /var/lib/lxc
+    rm -rf /etc/lxd
+    rm -rf /etc/lxc
+
     echo "Deleting nginx config files..."
     rm /etc/nginx/sites-available/cadvisor /etc/nginx/sites-enabled/cadvisor
     rm /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins
