@@ -247,14 +247,13 @@ function nginx_setup() {
     echo ""
     echo ""
     echo "Installing nginx-prometheus-exporter"
-    cd /root/
     echo "Downloading nginx-prometheus-exporter"
     curl -L "https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz" -o /root/nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz
     echo "Extracting nginx-prometheus-exporter"
     tar -xzf /root/nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz
     echo "chmod and moving nginx-prometheus-exporter to /usr/local/bin"
-    chmod +x nginx-prometheus-exporter
-    mv nginx-prometheus-exporter /usr/local/bin/nginx-prometheus-exporter
+    chmod +x /root/nginx-prometheus-exporter
+    mv /root/nginx-prometheus-exporter /usr/local/bin/nginx-prometheus-exporter
     
     echo ""
     echo ""
