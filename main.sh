@@ -705,12 +705,8 @@ function reset_server () {
     echo "Resetting server..."
 
     echo "Deleting containers..."
-    # stop and destroy all lxc containers at once
-    lxc-ls -f | awk '{print $1}' | grep -v NAME | xargs -I {} lxc-stop -n {}
-    lxc-ls -f | awk '{print $1}' | grep -v NAME | xargs -I {} lxc-destroy -n {}
-
     # Make a for loop to remove all containers lxc that match the names in this script
-    for i in jenkins prometheus grafana tolgee owncloud; do
+    for i in monitoring tolgee owncloud nextcloud; do
         if [ -d "/var/lib/lxc/$i" ]; then
             echo "Deleting container $i"
             lxc-stop -n $i
@@ -726,11 +722,6 @@ function reset_server () {
     echo "Deleting lxd and lxc..."
     apt-get remove -y lxc
     snap remove lxd
-
-    rm -rf /var/lib/lxd
-    rm -rf /var/lib/lxc
-    rm -rf /etc/lxd
-    rm -rf /etc/lxc
 
     echo "Deleting nginx config files..."
     rm /etc/nginx/sites-available/cadvisor /etc/nginx/sites-enabled/cadvisor
