@@ -254,22 +254,7 @@ function nginx_setup() {
     echo "chmod and moving nginx-prometheus-exporter to /usr/local/bin"
     chmod +x /root/nginx-prometheus-exporter
     mv /root/nginx-prometheus-exporter /usr/local/bin/nginx-prometheus-exporter
-    
-    # Installing nginx-prometheus-exporter
-    # Downloading nginx-prometheus-exporter
-    # % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-    #                                 Dload  Upload   Total   Spent    Left  Speed
-    # 0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-    # 100 3513k  100 3513k    0     0  6088k      0 --:--:-- --:--:-- --:--:-- 6088k
-    # Extracting nginx-prometheus-exporter
-    # tar (child): /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz: Cannot open: No such file or directory
-    # tar (child): Error is not recoverable: exiting now
-    # tar: Child returned status 2
-    # tar: Error is not recoverable: exiting now
-    # chmod and moving nginx-prometheus-exporter to /usr/local/bin
-    # chmod: cannot access '/root/nginx-prometheus-exporter': No such file or directory
-    # mv: cannot stat '/root/nginx-prometheus-exporter': No such file or directory
-    
+
     echo ""
     echo ""
     echo "Creating nginx-prometheus-exporter.service"
@@ -456,6 +441,7 @@ function create_container () {
     mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
 
     lxc-start -n $container_name
+    sleep 2
     lxc-attach $container_name -- hostnamectl set-hostname $container_name
     sed -i '/127.0.0.1/c\127.0.0.1 '${container_name} /var/lib/lxc/$container_name/rootfs/etc/hosts
     lxc-stop -n $container_name
@@ -497,8 +483,8 @@ function create_container () {
         echo "    static_configs:" >> $file_name
         echo "      - targets: ['$host_ip:8899']" >> $file_name
 
-        lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key"
-        lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list"
+        lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key"
+        lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list"
         lxc-attach $container_name -- apt-get update -y > /dev/null
         sleep 5
         lxc-attach $container_name -- apt-get install grafana -y > /dev/null
