@@ -154,7 +154,7 @@ function lxc_lxd_setup () {
     sleep 2
 
     adduser devops lxd
-    su -c "lxd init" devops
+    su -c "lxd init --preseed - < /root/cluster-setup-script/lxd_init.yaml" devops
 
     lxc network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
     lxc network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
