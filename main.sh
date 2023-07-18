@@ -474,18 +474,8 @@ function create_container () {
         echo "    static_configs:" >> $file_name
         echo "      - targets: ['$host_ip:8899']" >> $file_name
 
-        wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
-        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
-        lxc-attach $container_name -- apt-get update -y > /dev/null
-        sleep 5
-        lxc-attach $container_name -- apt-get install grafana -y > /dev/null
-        sleep 5
-        lxc-attach $container_name -- systemctl daemon-reload
-        lxc-attach $container_name -- systemctl start grafana-server
-        lxc-attach $container_name -- systemctl enable grafana-server.service
-
-        wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key
-        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list
+        lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt-get.grafana.com/gpg.key"
+        lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt-get.grafana.com stable main" | sudo tee -a /etc/apt-get/sources.list.d/grafana.list"
         lxc-attach $container_name -- apt-get update -y > /dev/null
         sleep 5
         lxc-attach $container_name -- apt-get install grafana -y > /dev/null
