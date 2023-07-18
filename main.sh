@@ -229,9 +229,18 @@ function nginx_setup() {
     snap install --classic certbot > /dev/null
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
+    ip_self=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    read -p "What is the IP tou want to allow " IP_nginx
 
     rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx.conf /etc/nginx/nginx.conf
+    sed -i "/allow 127.0.0.1;/a \\\n\
+                    allow $ip_self;" /etc/nginx/nginx.conf
+    sed -i "/allow $ip_self;/a \\\n\
+                    allow $IP_nginx;" /etc/nginx/nginx.conf
+    sed -i "/allow $IP_nginx;/a \\\n\
+                    allow 10.128.151.0/24;" /etc/nginx/nginx.conf
+
     
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
@@ -306,6 +315,11 @@ function vps_setup_single () {
     systemctl restart nginx.service
     sed -i "s/#Port 22/Port 6845/g" /etc/ssh/sshd_config
     systemctl restart sshd.service
+
+    echo ""
+    echo "--------------------BACKUP SETUP--------------------"
+    backup_server
+
 
     echo ""
     echo ""
@@ -444,6 +458,7 @@ function create_container () {
     sleep 2
     lxc-attach $container_name -- hostnamectl set-hostname $container_name
     sed -i '/127.0.0.1/c\127.0.0.1 '${container_name} /var/lib/lxc/$container_name/rootfs/etc/hosts
+    lxc-attach $container_name -- bash -c "echo $container_name > /etc/hostname"
     lxc-stop -n $container_name
     lxc-start -n $container_name
 
@@ -455,7 +470,11 @@ function create_container () {
     sleep 5
     lxc-attach $container_name -- systemctl restart systemd-resolved
     sleep 5
+    lxc-stop -n $container_name
+    lxc-autostart -n $container_name
+    lxc-start -n $container_name
 
+    echo ""
     echo "--------------------CONTAINER STARTED--------------------"
 
     echo ""
@@ -465,23 +484,23 @@ function create_container () {
     "monitoring")
         update_install_packages $container_name prometheus
         file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
-	    host_ip=$(ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//')
+	    host_ip=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 
 	    # Add the content to the file
 	    echo "" >> $file_name
-	    echo "  - job_name: node" >> $file_name
+	    echo "  - job_name: nodexp" >> $file_name
     	echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$host_ip:9111']" >> $file_name
+	    echo "      - targets: ['$gateway:9111']" >> $file_name
 
 	    echo "" >> $file_name
 	    echo "  - job_name: 'nginx'" >> $file_name
 	    echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$host_ip:8888']" >> $file_name
+	    echo "      - targets: ['$host_ip:8080']" >> $file_name
 
         echo "" >> $file_name
         echo "  - job_name: 'cadvisor'" >> $file_name
         echo "    static_configs:" >> $file_name
-        echo "      - targets: ['$host_ip:8899']" >> $file_name
+        echo "      - targets: ['$gateway:8899']" >> $file_name
 
         lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key"
         lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list"
@@ -655,31 +674,14 @@ function create_container () {
     echo ""
     echo "The container's IP address is: $IP"
     echo "The container's hostname is: $container_name"
-    echo "The container's domain name is: $srv_name"
-    echo "The container's ports are:"
     case $container_name in
     "monitoring")
-        echo "Prometheus: $IP:9090"
-        echo "Grafana: $IP:3000"
-        echo "Cadvisor: $IP:8899"
+        echo "Your visual monitoring services are available at: "
+        echo $srv_name
+        echo "cadvisor.$dom"
         ;;
-    "tolgee")
-        echo "Tolgee: $IP:8200"
-        ;;
-    "appsmith")
-        echo "Appsmith: $IP:8000"
-        ;;
-    "n8n")
-        echo "n8n: $IP:5678"
-        ;;
-    "owncloud")
-        echo "owncloud: $IP:80"
-        ;;
-    "nextcloud")
-        echo "nextcloud: $IP:80"
-        ;;
-    "react")
-        echo "react: $IP:3000"
+    *)
+        echo "You can go to your site at: ${srv_name}'
         ;;
     esac
     
