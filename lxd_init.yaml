@@ -9,10 +9,6 @@ profiles:
 - config: {}
   description: ""
   devices:
-    eth0:
-      name: eth0
-      network: lxdbr0
-      type: nic
     root:
       path: /
       pool: default
