@@ -243,13 +243,22 @@ function nginx_setup() {
     cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
     openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
     chmod 644 /etc/letsencrypt/ssl-dhparams.pem
-
+    
+    echo ""
+    echo ""
+    echo "Installing nginx-prometheus-exporter"
     cd /root/
+    echo "Downloading nginx-prometheus-exporter"
     curl -LO "https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz"
+    echo "Extracting nginx-prometheus-exporter"
     tar -xzf "nginx-prometheus-exporter-0.11.0-linux-amd64.tar.gz"
+    echo "chmod and moving nginx-prometheus-exporter to /usr/local/bin"
     chmod +x nginx-prometheus-exporter
     mv nginx-prometheus-exporter /usr/local/bin/nginx-prometheus-exporter
-
+    
+    echo ""
+    echo ""
+    echo "Creating nginx-prometheus-exporter.service"
     cp /root/cluster-setup-script/nginx-prometheus-exporter.service /etc/systemd/system/nginx-prometheus-exporter.service
     systemctl daemon-reload
     systemctl enable nginx-prometheus-exporter.service
