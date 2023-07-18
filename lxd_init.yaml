@@ -1,8 +1,7 @@
 config: {}
 networks: []
 storage_pools:
-- config:
-    size: 15GB
+- config: {}
   description: ""
   name: default
   driver: dir
