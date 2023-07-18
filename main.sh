@@ -296,6 +296,8 @@ function vps_setup_single () {
     wireguard_setup
 
     systemctl restart nginx.service
+    sed -i "s/#Port 22/Port 6845/g" /etc/ssh/sshd_config
+    systemctl restart sshd.service
 
     echo ""
     echo ""
