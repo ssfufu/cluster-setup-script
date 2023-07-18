@@ -248,12 +248,27 @@ function nginx_setup() {
     echo ""
     echo "Installing nginx-prometheus-exporter"
     echo "Downloading nginx-prometheus-exporter"
-    curl -LO https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz -o /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
+    curl -L https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz -o /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
     echo "Extracting nginx-prometheus-exporter"
     tar -xzf /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
     echo "chmod and moving nginx-prometheus-exporter to /usr/local/bin"
     chmod +x /root/nginx-prometheus-exporter
     mv /root/nginx-prometheus-exporter /usr/local/bin/nginx-prometheus-exporter
+    
+    # Installing nginx-prometheus-exporter
+    # Downloading nginx-prometheus-exporter
+    # % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+    #                                 Dload  Upload   Total   Spent    Left  Speed
+    # 0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+    # 100 3513k  100 3513k    0     0  6088k      0 --:--:-- --:--:-- --:--:-- 6088k
+    # Extracting nginx-prometheus-exporter
+    # tar (child): /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz: Cannot open: No such file or directory
+    # tar (child): Error is not recoverable: exiting now
+    # tar: Child returned status 2
+    # tar: Error is not recoverable: exiting now
+    # chmod and moving nginx-prometheus-exporter to /usr/local/bin
+    # chmod: cannot access '/root/nginx-prometheus-exporter': No such file or directory
+    # mv: cannot stat '/root/nginx-prometheus-exporter': No such file or directory
     
     echo ""
     echo ""
