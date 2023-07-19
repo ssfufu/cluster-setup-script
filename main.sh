@@ -196,7 +196,7 @@ function nginx_ct_setup() {
         -e "s#proxy_redirect#proxy_redirect ${PROXY_REDIRECT};#g" \
         -e "s#/etc/letsencrypt/live//#/etc/letsencrypt/live/${SERVER_NAME}/#g" \
         -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" \
-        -e "/location \/ {/a deny all;" /root/cluster-setup-script/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
+        -e "/location \/ {/a deny all;" /root/cluster-setup-script/nginx/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
     
     # Add the allowed IPs
     for ip in $ALLOWED_IPS; do
@@ -233,7 +233,7 @@ function nginx_setup() {
     read -p "What is the IP tou want to allow " IP_nginx
 
     rm /etc/nginx/nginx.conf
-    cp /root/cluster-setup-script/nginx.conf /etc/nginx/nginx.conf
+    cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
     sed -i "/allow 127.0.0.1;/a \\\n\
                     allow $ip_self;" /etc/nginx/nginx.conf
     sed -i "/allow $ip_self;/a \\\n\
@@ -244,12 +244,12 @@ function nginx_setup() {
     
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
-    cp /root/cluster-setup-script/default_conf /etc/nginx/sites-available/default
+    cp /root/cluster-setup-script/nginx/default_conf /etc/nginx/sites-available/default
     ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
 
     rm /etc/letsencrypt/options-ssl-nginx.conf > /dev/null
     mkdir -p /etc/letsencrypt/
-    cp /root/cluster-setup-script/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
+    cp /root/cluster-setup-script/nginx/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
     openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
     chmod 644 /etc/letsencrypt/ssl-dhparams.pem
     
@@ -267,7 +267,7 @@ function nginx_setup() {
     echo ""
     echo ""
     echo "Creating nginx-prometheus-exporter.service"
-    cp /root/cluster-setup-script/nginx-prometheus-exporter.service /etc/systemd/system/nginx-prometheus-exporter.service
+    cp /root/cluster-setup-script/prometheus/nginx-prometheus-exporter.service /etc/systemd/system/nginx-prometheus-exporter.service
     systemctl daemon-reload
     systemctl enable nginx-prometheus-exporter.service
     systemctl start nginx-prometheus-exporter.service
@@ -344,9 +344,24 @@ function update_install_packages () {
 
 }
 
+function check_docker_container_exists() {
+    local dcname="$1"
+    if [ "$(docker ps -a -q -f name=^/${dcname}$)" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 function create_container () {
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
-    echo "monitoring, tolgee, appsmith, n8n, owncloud, nextcloud, react"
+    docker_cts=("n8n" "appsmith")
+    lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react")
+    echo "The following containers are available:"
+    echo "Docker containers: ${docker_cts[*]}"
+    echo "LXC containers: ${lxc_cts[*]}"
+    echo ""
+
 
     read -p "Enter the container name: " container_name
     if [ -z "$container_name" ]; then
@@ -357,347 +372,357 @@ function create_container () {
         echo "Container name not in the list"
         exit 1
     fi
-    if [ -d "/var/lib/lxc/$container_name" ]; then
+    if [ -d "/var/lib/lxc/$container_name"]; then
         echo "Container named $container_name already exists"
         exit 1
-    fi
-
-    read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
-
-    # asks the user for the network interface the container will use, list the interfaces to choose from
-    echo -e "\nThe following interfaces are available:"
-    ip a | grep -E "^[0-9]" | awk '{print $2}' | sed 's/://g' | grep -E "^DMZ" | sed 's/^/ - /g'
-    echo ""
-    read -p "Enter the interface the container will use: " interface
-
-    # store the gateway IP address of the interface
-    gateway=$(ip r | grep -w "$interface" | awk '{print $9}')
-
-    if [ -z "$interface" ]; then
-        echo "You must enter an interface"
-        exit 1
-    fi
-
-    if ! ip a | grep -E "^[0-9]" | awk '{print $2}' | sed 's/://g' | grep -w "$interface" >/dev/null; then
-        echo "Interface $interface does not exist"
-        exit 1
-    fi
-
-    range_start=2
-    range_end=254
-    # Get the subnet
-    subnet=$(echo "$gateway" | cut -d"." -f1-3)
-
-    # Loop through the IP addresses
-    for i in $(seq $range_start $range_end); do
-        IP="$subnet.$i"
-        # Check if the IP address is in use
-        if ! ping -c 1 -W 1 "$IP" > /dev/null 2>&1; then
-            echo "Found available IP address: $IP"
-            break
-        fi
-    done
-
-    # Check if we found an IP address
-    if [ -z "$IP" ]; then
-        echo "No available IP addresses found in the range $subnet.$range_start to $subnet.$range_end"
-        exit 1
-    fi
-
-    dom="$(cat /root/domain.txt)"
-    srv_name="${container_name}.${dom}"
-
-    echo ""
-    echo "--------------------CREATING CONTAINER--------------------"
-    # creates a file at /var/lib/lxc/<container_name>/rootfs/etc/systemd/network/10-eth0.network
-    touch /tmp/10-eth0.network
-    net_file="/tmp/10-eth0.network"
-
-    echo "Creating network file..."
-    echo "[Match]" >> $net_file
-    echo "Name=eth0" >> $net_file
-    echo "" >> $net_file
-    echo "[Network]" >> $net_file
-    echo "Address=$IP/24" >> $net_file
-    echo "Gateway=$gateway" >> $net_file
-    echo "DNS=8.8.8.8" >> $net_file
-
-    lxc-create -t download -n $container_name -- -d debian -r bullseye -a amd64 > /dev/null
-    sleep 5
-    echo "--------------------CONTAINER CREATED--------------------"
-    echo ""
-    echo "--------------------STARTING CONTAINER--------------------"
-    # updates the container's config file
-    echo "Updating container's config file"
-    sed -i "s/lxc.net.0.link = lxcbr0/lxc.net.0.link = $interface/g" /var/lib/lxc/$container_name/config
-    echo "lxc.net.0.ipv4.address = $IP/24" >> /var/lib/lxc/$container_name/config
-    echo "lxc.net.0.ipv4.gateway = $gateway" >> /var/lib/lxc/$container_name/config
-
-    #take the /var/lib/lxc/<container_name>/rootfs/etc/systemd/resolved.conf file and add the DNS=
-    echo "Adding DNS to the container's resolved.conf file"
-
-    # checks if DNS= is commented or not
-    if grep -q "#DNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
-        sed -i "s/#DNS=/DNS=8.8.8.8/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
     else
-        echo "DNS=8.8.8.8" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+        if echo "monitoring tolgee owncloud nextcloud react" | grep -w "$container_name" >/dev/null; then
+            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
+
+            # asks the user for the network interface the container will use, list the interfaces to choose from
+            echo -e "\nThe following interfaces are available:"
+            ip a | grep -E "^[0-9]" | awk '{print $2}' | sed 's/://g' | grep -E "^DMZ" | sed 's/^/ - /g'
+            echo ""
+            read -p "Enter the interface the container will use: " interface
+
+            # store the gateway IP address of the interface
+            gateway=$(ip r | grep -w "$interface" | awk '{print $9}')
+
+            if [ -z "$interface" ]; then
+                echo "You must enter an interface"
+                exit 1
+            fi
+
+            if ! ip a | grep -E "^[0-9]" | awk '{print $2}' | sed 's/://g' | grep -w "$interface" >/dev/null; then
+                echo "Interface $interface does not exist"
+                exit 1
+            fi
+
+            range_start=2
+            range_end=254
+            # Get the subnet
+            subnet=$(echo "$gateway" | cut -d"." -f1-3)
+
+            # Loop through the IP addresses
+            for i in $(seq $range_start $range_end); do
+                IP="$subnet.$i"
+                # Check if the IP address is in use
+                if ! ping -c 1 -W 1 "$IP" > /dev/null 2>&1; then
+                    echo "Found available IP address: $IP"
+                    break
+                fi
+            done
+
+            # Check if we found an IP address
+            if [ -z "$IP" ]; then
+                echo "No available IP addresses found in the range $subnet.$range_start to $subnet.$range_end"
+                exit 1
+            fi
+
+            dom="$(cat /root/domain.txt)"
+            srv_name="${container_name}.${dom}"
+
+            echo ""
+            echo "--------------------CREATING CONTAINER--------------------"
+            # creates a file at /var/lib/lxc/<container_name>/rootfs/etc/systemd/network/10-eth0.network
+            touch /tmp/10-eth0.network
+            net_file="/tmp/10-eth0.network"
+
+            echo "Creating network file..."
+            echo "[Match]" >> $net_file
+            echo "Name=eth0" >> $net_file
+            echo "" >> $net_file
+            echo "[Network]" >> $net_file
+            echo "Address=$IP/24" >> $net_file
+            echo "Gateway=$gateway" >> $net_file
+            echo "DNS=8.8.8.8" >> $net_file
+
+            lxc-create -t download -n $container_name -- -d debian -r bullseye -a amd64 > /dev/null
+            sleep 5
+            echo "--------------------CONTAINER CREATED--------------------"
+            echo ""
+            echo "--------------------STARTING CONTAINER--------------------"
+            # updates the container's config file
+            echo "Updating container's config file"
+            sed -i "s/lxc.net.0.link = lxcbr0/lxc.net.0.link = $interface/g" /var/lib/lxc/$container_name/config
+            echo "lxc.net.0.ipv4.address = $IP/24" >> /var/lib/lxc/$container_name/config
+            echo "lxc.net.0.ipv4.gateway = $gateway" >> /var/lib/lxc/$container_name/config
+
+            #take the /var/lib/lxc/<container_name>/rootfs/etc/systemd/resolved.conf file and add the DNS=
+            echo "Adding DNS to the container's resolved.conf file"
+
+            # checks if DNS= is commented or not
+            if grep -q "#DNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
+                sed -i "s/#DNS=/DNS=8.8.8.8/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+            else
+                echo "DNS=8.8.8.8" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+            fi
+
+            #same for dnsfallback=
+            if grep -q "#FallbackDNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
+                sed -i "s/#FallbackDNS=/FallbackDNS=8.8.4.4/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+            else
+                echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+            fi
+
+            #replaces the container's rootfs with the network file
+            echo "Replacing container's rootfs with the network file"
+            mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
+
+            lxc-start -n $container_name
+            sleep 2
+            lxc-attach $container_name -- hostnamectl set-hostname $container_name
+            sed -i '/127.0.0.1/c\127.0.0.1 '${container_name} /var/lib/lxc/$container_name/rootfs/etc/hosts
+            lxc-attach $container_name -- bash -c "echo $container_name > /etc/hostname"
+            lxc-stop -n $container_name
+            lxc-start -n $container_name
+
+            sleep 5
+
+            lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+            sleep 5
+            lxc-attach $container_name -- systemctl restart systemd-networkd
+            sleep 5
+            lxc-attach $container_name -- systemctl restart systemd-resolved
+            sleep 5
+            lxc-stop -n $container_name
+            lxc-autostart -n $container_name
+            lxc-start -n $container_name
+
+            echo ""
+            echo "--------------------CONTAINER STARTED--------------------"
+
+            echo ""
+            echo "--------------------SETTING UP THE CONTAINER--------------------"
+            case $container_name in
+            "monitoring")
+                update_install_packages $container_name prometheus
+                file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
+                host_ip=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+
+                # Add the content to the file
+                echo "" >> $file_name
+                echo "  - job_name: nodexp" >> $file_name
+                echo "    static_configs:" >> $file_name
+                echo "      - targets: ['$gateway:9111']" >> $file_name
+
+                echo "" >> $file_name
+                echo "  - job_name: 'nginx'" >> $file_name
+                echo "    static_configs:" >> $file_name
+                echo "      - targets: ['$host_ip:8080']" >> $file_name
+
+                echo "" >> $file_name
+                echo "  - job_name: 'cadvisor'" >> $file_name
+                echo "    static_configs:" >> $file_name
+                echo "      - targets: ['$gateway:8899']" >> $file_name
+
+                lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key"
+                lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list"
+                lxc-attach $container_name -- apt-get update -y > /dev/null
+                sleep 5
+                lxc-attach $container_name -- apt-get install grafana -y > /dev/null
+                sleep 5
+                lxc-attach $container_name -- systemctl daemon-reload
+                lxc-attach $container_name -- systemctl start grafana-server
+                lxc-attach $container_name -- systemctl enable grafana-server.service
+
+                nginx_ct_setup $IP "3000" $container_name $allowed_ips
+                ;;
+
+
+            "tolgee")
+                update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
+                sleep 10
+
+                echo ""
+                echo "--- Setting up PostgreSQL ---"
+                read -s -p "Please enter a password for the database (also it will be the initial password for the intial user <tolgee>): " db_password
+                echo ""
+                
+                echo "Creating database..."
+                lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE DATABASE tolgee;'\""
+
+                echo "Creating user..."
+                lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE USER tolgee WITH ENCRYPTED PASSWORD '\''${db_password}'\'';'\""
+
+                echo "Granting privileges..."
+                lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;'\""
+
+                lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
+                sleep 5
+                echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\n
+                    spring.datasource.username=tolgee\n
+                    spring.datasource.password=${db_password}\n
+                    server.port=8200\n
+                    tolgee.authentication.enabled=true\n
+                    tolgee.authentication.create-initial-user=true\n
+                    tolgee.authentication.initial-username=tolgee\n
+                    tolgee.authentication.initial-password=${db_password}\n" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
+
+                cp /root/cluster-setup-script/tolgee/tolgee.service /var/lib/lxc/${container_name}/rootfs/etc/systemd/system/tolgee.service
+
+                lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
+                sleep 2
+                lxc-attach $container_name -- bash -c "systemctl daemon-reload"
+                sleep 2
+                lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
+                sleep 5
+                nginx_ct_setup $IP "8200" $container_name $allowed_ips
+                ;;
+
+            "owncloud")
+                update_install_packages $container_name mariadb-server php-fpm php-mysql php-xml php-mbstring php-gd php-curl nginx php7.4-fpm php7.4-mysql php7.4-common php7.4-gd php7.4-json php7.4-curl php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl
+                sleep 10
+                rm /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
+                cp /root/cluster-setup-script/owncloud-nextcloud/config-owncloud /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
+                sed -i "s/server_name/server_name $IP;/g" /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
+
+                lxc-attach $container_name -- bash -c "curl https://download.owncloud.org/download/repositories/production/Debian_11/Release.key | apt-get-key add -"
+                lxc-attach $container_name -- bash -c "echo 'deb http://download.owncloud.org/download/repositories/production/Debian_11/ /' > /etc/apt-get/sources.list.d/owncloud.list"
+                lxc-attach $container_name -- apt-get update -y
+                lxc-attach $container_name -- apt-get install -y owncloud-files
+
+                # Configure MariaDB
+                echo -n "Please enter a owncloud database password: "
+                read -s db_password
+                lxc-attach $container_name -- bash -c "mysql -e \"CREATE DATABASE owncloud; GRANT ALL ON owncloud.* to 'owncloud'@'localhost' IDENTIFIED BY '${db_password}'; FLUSH PRIVILEGES;\""
+
+                # Configure PHP
+                lxc-attach $container_name -- bash -c "sed -i 's/post_max_size = .*/post_max_size = 2000M/' /etc/php/7.4/fpm/php.ini"
+                lxc-attach $container_name -- bash -c "sed -i 's/upload_max_filesize = .*/upload_max_filesize = 2000M/' /etc/php/7.4/fpm/php.ini"
+                lxc-attach $container_name -- bash -c "sed -i 's/max_execution_time = .*/max_execution_time = 3600/' /etc/php/7.4/fpm/php.ini"
+                lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
+                lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
+                lxc-attach $container_name -- bash -c "systemctl restart nginx"
+                nginx_ct_setup $IP "80" $container_name $allowed_ips
+                ;;
+            "nextcloud")
+                update_install_packages $container_name apache2 libapache2-mod-php mariadb-client unzip wget php-gd php-json php-mysql php-curl php-mbstring php-intl php-imagick php-xml php-zip
+                sleep 10
+                lxc-attach $container_name -- bash -c "sudo wget https://packages.sury.org/php/apt.gpg -O /etc/apt/trusted.gpg.d/php.gpg"
+                lxc-attach $container_name -- bash -c "echo 'deb https://packages.sury.org/php/ $(lsb_release -sc) main' > /etc/apt/sources.list.d/php.list"
+                lxc-attach $container_name -- apt-get update -y
+                # install php 8.2
+                lxc-attach $container_name -- bash -c "apt-get install php8.2 php8.2-cli php8.2-common php8.2-curl php8.2-mbstring php8.2-mysql php8.2-xml php8.2-zip php8.2-intl php8.2-imagick -y"
+                lxc-attach $container_name -- bash -c "a2enmod php8.2 && a2dismod php7.4"
+                lxc-attach $container_name -- bash -c "systemctl restart apache2"
+                _domain="$(cat /root/domain.txt)"
+                lxc-attach $container_name -- bash -c "wget https://download.nextcloud.com/server/releases/latest.zip && unzip latest.zip -d /var/www/"
+                lxc-attach $container_name -- bash -c "chown -R www-data:www-data /var/www/nextcloud/"
+                lxc-attach $container_name -- bash -c "chmod -R 755 /var/www/nextcloud/"
+                sed -i "s/ServerName.*/ServerName ${container_name}.${_domain}/g" /root/cluster-setup-script/owncloud-nextcloud/nextcloud.conf
+                cp /root/cluster-setup-script/owncloud-nextcloud/nextcloud.conf /var/lib/lxc/$container_name/rootfs/etc/apache2/sites-available/nextcloud.conf
+                lxc-attach $container_name -- bash -c "a2ensite nextcloud"
+                lxc-attach $container_name -- bash -c "a2enmod rewrite headers env dir mime"
+                lxc-attach $container_name -- bash -c "a2dissite 000-default"
+                echo "ServerName ${container_name}" >> /var/lib/lxc/$container_name/rootfs/etc/apache2/apache2.conf
+                lxc-attach $container_name -- bash -c "systemctl restart apache2"
+
+                nginx_ct_setup $IP "80" $container_name $allowed_ips
+                ;;
+                
+            "react")
+                update_install_packages $container_name
+                # install nodejs latest version
+                lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
+                lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm"'
+                lxc-attach $container_name -- bash -c '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+
+                lxc-attach $container_name -- bash -c "nvm install --lts"
+                lxc-attach $container_name -- bash -c "nvm use --lts"
+
+                sleep 10
+                nginx_ct_setup $IP "3000" $container_name $allowed_ips
+                lxc-attach $container_name -- bash -c "npm install -g pm2"
+                lxc-attach $container_name -- bash -c "pm2 startup"
+                echo "Installing react..."
+                read -p "Enter the git repo: " git_repo
+                read -p "Is it a private repo? (y/n) " private_repo
+                if [ "$private_repo" == "y" ]; then
+                    read -p "Enter the git username: " git_username
+                    read -p "Enter the personal access token: " git_password
+                    git_repo=$(echo $git_repo | sed 's/https:\/\///g')
+                    git_repo="https://$git_username:$git_password@$git_repo"
+                fi
+                repo_name=$(echo $git_repo | sed 's/.*\///g' | sed 's/.git//g')
+
+                lxc-attach $container_name -- bash -c "mkdir /root/react"
+                lxc-attach $container_name -- bash -c "cd /root/react && git clone $git_repo"
+
+                lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && npm install && npm run build"
+                # check if the build folder is build or dist and store it in a variable
+                if [ -d "/root/react/${repo_name}/build" ]; then
+                    build_folder="build"
+                elif [ -d "/root/react/${repo_name}/dist" ]; then
+                    build_folder="dist"
+                else
+                    echo "Build folder not found"
+                    exit 1
+                fi
+
+                lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve ${build_folder} 3000 --name react"
+                lxc-attach $container_name -- bash -c "pm2 save"
+                lxc-attach $container_name -- bash -c "pm2 startup"
+                lxc-attach $container_name -- bash -c "systemctl restart pm2-root"
+                ;;
+
+            esac
+
+            sleep 3
+            lxc-info -n $container_name
+        fi
     fi
 
-    #same for dnsfallback=
-    if grep -q "#FallbackDNS=" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf; then
-        sed -i "s/#FallbackDNS=/FallbackDNS=8.8.4.4/g" /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
-    else
-        echo "FallbackDNS=8.8.4.4" >> /var/lib/lxc/$container_name/rootfs/etc/systemd/resolved.conf
+    check_docker_container_exists $container_name
+    if [ $? -eq 0 ]; then
+        echo "Container exists"
+        exit 1
+    else 
+        echo "Container does not exist"
+        case $container_name in
+        "appsmith")
+            echo -e "Setting up appsmith...\n"
+            mkdir /root/cluster-setup-script/appsmith
+            cd /root/cluster-setup-script/appsmith
+            curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
+            # Change the ports
+            sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
+            # sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
+            docker compose up -d
+            sleep 2
+            nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
+
+            echo -e "Setup done\n"
+            ;;
+
+        "n8n")
+            cd /root/cluster-setup-script/n8n
+            docker compose up -d
+            sleep 5
+            nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
+            ;;
+        esac
     fi
-
-    #replaces the container's rootfs with the network file
-    echo "Replacing container's rootfs with the network file"
-    mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
-
-    lxc-start -n $container_name
-    sleep 2
-    lxc-attach $container_name -- hostnamectl set-hostname $container_name
-    sed -i '/127.0.0.1/c\127.0.0.1 '${container_name} /var/lib/lxc/$container_name/rootfs/etc/hosts
-    lxc-attach $container_name -- bash -c "echo $container_name > /etc/hostname"
-    lxc-stop -n $container_name
-    lxc-start -n $container_name
-
-    sleep 5
-
-    lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-    sleep 5
-    lxc-attach $container_name -- systemctl restart systemd-networkd
-    sleep 5
-    lxc-attach $container_name -- systemctl restart systemd-resolved
-    sleep 5
-    lxc-stop -n $container_name
-    lxc-autostart -n $container_name
-    lxc-start -n $container_name
-
-    echo ""
-    echo "--------------------CONTAINER STARTED--------------------"
-
-    echo ""
-    echo "--------------------SETTING UP THE CONTAINER--------------------"
-
-    case $container_name in
-    "monitoring")
-        update_install_packages $container_name prometheus
-        file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
-	    host_ip=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-
-	    # Add the content to the file
-	    echo "" >> $file_name
-	    echo "  - job_name: nodexp" >> $file_name
-    	echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$gateway:9111']" >> $file_name
-
-	    echo "" >> $file_name
-	    echo "  - job_name: 'nginx'" >> $file_name
-	    echo "    static_configs:" >> $file_name
-	    echo "      - targets: ['$host_ip:8080']" >> $file_name
-
-        echo "" >> $file_name
-        echo "  - job_name: 'cadvisor'" >> $file_name
-        echo "    static_configs:" >> $file_name
-        echo "      - targets: ['$gateway:8899']" >> $file_name
-
-        lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key"
-        lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list"
-        lxc-attach $container_name -- apt-get update -y > /dev/null
-        sleep 5
-        lxc-attach $container_name -- apt-get install grafana -y > /dev/null
-        sleep 5
-        lxc-attach $container_name -- systemctl daemon-reload
-        lxc-attach $container_name -- systemctl start grafana-server
-        lxc-attach $container_name -- systemctl enable grafana-server.service
-
-        nginx_ct_setup $IP "3000" $container_name $allowed_ips
-        ;;
-
-
-	"tolgee")
-        update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
-	    sleep 10
-
-        echo ""
-        echo "--- Setting up PostgreSQL ---"
-        read -s -p "Please enter a password for the database (also it will be the initial password for the intial user <tolgee>): " db_password
-        echo ""
-        
-        echo "Creating database..."
-        lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE DATABASE tolgee;'\""
-
-        echo "Creating user..."
-        lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE USER tolgee WITH ENCRYPTED PASSWORD '\''${db_password}'\'';'\""
-
-        echo "Granting privileges..."
-        lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;'\""
-
-	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
-        sleep 5
-	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\n
-            spring.datasource.username=tolgee\n
-            spring.datasource.password=${db_password}\n
-            server.port=8200\n
-            tolgee.authentication.enabled=true\n
-            tolgee.authentication.create-initial-user=true\n
-            tolgee.authentication.initial-username=tolgee\n
-            tolgee.authentication.initial-password=${db_password}\n" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
-
-        cp /root/cluster-setup-script/tolgee/tolgee.service /var/lib/lxc/${container_name}/rootfs/etc/systemd/system/tolgee.service
-
-	    lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
-        sleep 2
-	    lxc-attach $container_name -- bash -c "systemctl daemon-reload"
-	    sleep 2
-	    lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
-        sleep 5
-        nginx_ct_setup $IP "8200" $container_name $allowed_ips
-	    ;;
-
-	"appsmith")
-	    echo -e "Setting up appsmith...\n"
-	    mkdir /root/cluster-setup-script/appsmith
-        cd /root/cluster-setup-script/appsmith
-    	curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
-        # Change the ports
-        sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
-        # sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
-        docker compose up -d
-	    sleep 2
-        nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
-
-	    echo -e "Setup done\n"
-        ;;
-
-    "n8n")
-        cd /root/cluster-setup-script/n8n
-        docker compose up -d
-        sleep 5
-        nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
-        ;;
-    "owncloud")
-        update_install_packages $container_name mariadb-server php-fpm php-mysql php-xml php-mbstring php-gd php-curl nginx php7.4-fpm php7.4-mysql php7.4-common php7.4-gd php7.4-json php7.4-curl php7.4-zip php7.4-xml php7.4-mbstring php7.4-bz2 php7.4-intl
-        sleep 10
-        rm /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
-        cp /root/cluster-setup-script/config-owncloud /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
-        sed -i "s/server_name/server_name $IP;/g" /var/lib/lxc/$container_name/rootfs/etc/nginx/sites-available/default
-
-        lxc-attach $container_name -- bash -c "curl https://download.owncloud.org/download/repositories/production/Debian_11/Release.key | apt-get-key add -"
-        lxc-attach $container_name -- bash -c "echo 'deb http://download.owncloud.org/download/repositories/production/Debian_11/ /' > /etc/apt-get/sources.list.d/owncloud.list"
-        lxc-attach $container_name -- apt-get update -y
-        lxc-attach $container_name -- apt-get install -y owncloud-files
-
-        # Configure MariaDB
-        echo -n "Please enter a owncloud database password: "
-        read -s db_password
-        lxc-attach $container_name -- bash -c "mysql -e \"CREATE DATABASE owncloud; GRANT ALL ON owncloud.* to 'owncloud'@'localhost' IDENTIFIED BY '${db_password}'; FLUSH PRIVILEGES;\""
-
-        # Configure PHP
-        lxc-attach $container_name -- bash -c "sed -i 's/post_max_size = .*/post_max_size = 2000M/' /etc/php/7.4/fpm/php.ini"
-        lxc-attach $container_name -- bash -c "sed -i 's/upload_max_filesize = .*/upload_max_filesize = 2000M/' /etc/php/7.4/fpm/php.ini"
-        lxc-attach $container_name -- bash -c "sed -i 's/max_execution_time = .*/max_execution_time = 3600/' /etc/php/7.4/fpm/php.ini"
-        lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
-        lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
-        lxc-attach $container_name -- bash -c "systemctl restart nginx"
-        nginx_ct_setup $IP "80" $container_name $allowed_ips
-        ;;
-    "nextcloud")
-        update_install_packages $container_name apache2 libapache2-mod-php mariadb-client unzip wget php-gd php-json php-mysql php-curl php-mbstring php-intl php-imagick php-xml php-zip
-        sleep 10
-        lxc-attach $container_name -- bash -c "sudo wget https://packages.sury.org/php/apt.gpg -O /etc/apt/trusted.gpg.d/php.gpg"
-        lxc-attach $container_name -- bash -c "echo 'deb https://packages.sury.org/php/ $(lsb_release -sc) main' > /etc/apt/sources.list.d/php.list"
-        lxc-attach $container_name -- apt-get update -y
-        # install php 8.2
-        lxc-attach $container_name -- bash -c "apt-get install php8.2 php8.2-cli php8.2-common php8.2-curl php8.2-mbstring php8.2-mysql php8.2-xml php8.2-zip php8.2-intl php8.2-imagick -y"
-        lxc-attach $container_name -- bash -c "a2enmod php8.2 && a2dismod php7.4"
-        lxc-attach $container_name -- bash -c "systemctl restart apache2"
-        _domain="$(cat /root/domain.txt)"
-        lxc-attach $container_name -- bash -c "wget https://download.nextcloud.com/server/releases/latest.zip && unzip latest.zip -d /var/www/"
-        lxc-attach $container_name -- bash -c "chown -R www-data:www-data /var/www/nextcloud/"
-        lxc-attach $container_name -- bash -c "chmod -R 755 /var/www/nextcloud/"
-        sed -i "s/ServerName.*/ServerName ${container_name}.${_domain}/g" /root/cluster-setup-script/nextcloud.conf
-        cp /root/cluster-setup-script/nextcloud.conf /var/lib/lxc/$container_name/rootfs/etc/apache2/sites-available/nextcloud.conf
-        lxc-attach $container_name -- bash -c "a2ensite nextcloud"
-        lxc-attach $container_name -- bash -c "a2enmod rewrite headers env dir mime"
-        lxc-attach $container_name -- bash -c "a2dissite 000-default"
-        echo "ServerName ${container_name}" >> /var/lib/lxc/$container_name/rootfs/etc/apache2/apache2.conf
-        lxc-attach $container_name -- bash -c "systemctl restart apache2"
-
-        nginx_ct_setup $IP "80" $container_name $allowed_ips
-        ;;
-        
-    "react")
-        update_install_packages $container_name
-        # install nodejs latest version
-        lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
-        lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm"'
-        lxc-attach $container_name -- bash -c '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
-
-        lxc-attach $container_name -- bash -c "nvm install --lts"
-        lxc-attach $container_name -- bash -c "nvm use --lts"
-
-        sleep 10
-        nginx_ct_setup $IP "3000" $container_name $allowed_ips
-        lxc-attach $container_name -- bash -c "npm install -g pm2"
-        lxc-attach $container_name -- bash -c "pm2 startup"
-        echo "Installing react..."
-        read -p "Enter the git repo: " git_repo
-        read -p "Is it a private repo? (y/n) " private_repo
-        if [ "$private_repo" == "y" ]; then
-            read -p "Enter the git username: " git_username
-            read -p "Enter the personal access token: " git_password
-            git_repo=$(echo $git_repo | sed 's/https:\/\///g')
-            git_repo="https://$git_username:$git_password@$git_repo"
-        fi
-        repo_name=$(echo $git_repo | sed 's/.*\///g' | sed 's/.git//g')
-
-        lxc-attach $container_name -- bash -c "mkdir /root/react"
-        lxc-attach $container_name -- bash -c "cd /root/react && git clone $git_repo"
-
-        lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && npm install && npm run build"
-        # check if the build folder is build or dist and store it in a variable
-        if [ -d "/root/react/${repo_name}/build" ]; then
-            build_folder="build"
-        elif [ -d "/root/react/${repo_name}/dist" ]; then
-            build_folder="dist"
-        else
-            echo "Build folder not found"
-            exit 1
-        fi
-
-        lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve ${build_folder} 3000 --name react"
-        lxc-attach $container_name -- bash -c "pm2 save"
-        lxc-attach $container_name -- bash -c "pm2 startup"
-        lxc-attach $container_name -- bash -c "systemctl restart pm2-root"
-
-        ;;
-	esac
 
     sleep 3
-    lxc-info -n $container_name
 
     echo ""
     echo "--------------------CONTAINER SETUP DONE--------------------"
     echo ""
-    echo "The container's IP address is: $IP"
-    echo "The container's hostname is: $container_name"
     case $container_name in
     "monitoring")
         echo "Your visual monitoring services are available at: "
-        echo $srv_name
-        echo "cadvisor.$dom"
+        echo https://$srv_name
+        echo "https://cadvisor.$dom"
         ;;
     *)
-        echo "You can go to your site at: ${srv_name}"
+        echo "You can go to your site at: https://${srv_name}"
         ;;
     esac
     echo ""
     echo -e "\e[31mThe container is ready but it might take a few moments to get the applications running\e[0m"
     echo ""
     echo "You can now run the script again to create another container"
-
     
     exit 0
 }
