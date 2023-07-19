@@ -522,7 +522,7 @@ function create_container () {
 
         echo ""
         echo "--- Setting up PostgreSQL ---"
-        read -s -p "Please enter a password for the database: " db_password
+        read -s -p "Please enter a password for the database (also it will be the initial password for the intial user <tolgee>): " db_password
         echo ""
         
         echo "Creating database..."
@@ -536,9 +536,16 @@ function create_container () {
 
 	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
         sleep 5
-	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\nspring.datasource.username=tolgee\nspring.datasource.password=${db_password}\nserver.port=8200" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
+	    echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\n
+            spring.datasource.username=tolgee\n
+            spring.datasource.password=${db_password}\n
+            server.port=8200\n
+            tolgee.authentication.enabled=true\n
+            tolgee.authentication.create-initial-user=true\n
+            tolgee.authentication.initial-username=tolgee\n
+            tolgee.authentication.initial-password=${db_password}\n" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
 
-        cp /root/cluster-setup-script/tolgee.service /var/lib/lxc/${container_name}/rootfs/etc/systemd/system/tolgee.service
+        cp /root/cluster-setup-script/tolgee/tolgee.service /var/lib/lxc/${container_name}/rootfs/etc/systemd/system/tolgee.service
 
 	    lxc-attach $container_name -- bash -c "pg_ctlcluster 13 main start"
         sleep 2
@@ -551,16 +558,13 @@ function create_container () {
 
 	"appsmith")
 	    echo -e "Setting up appsmith...\n"
-	    mkdir /root/appsmith
-        cd /root/appsmith
-
+	    mkdir /root/cluster-setup-script/appsmith
+        cd /root/cluster-setup-script/appsmith
     	curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
-
         # Change the ports
         sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
         # sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
-
-	    docker-compose up -d
+        docker compose up -d
 	    sleep 2
         nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
 
@@ -568,8 +572,8 @@ function create_container () {
         ;;
 
     "n8n")
-        cd /root/cluster-setup-script
-        docker-compose up -d
+        cd /root/cluster-setup-script/n8n
+        docker compose up -d
         sleep 5
         nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
         ;;
