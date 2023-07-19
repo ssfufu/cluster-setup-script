@@ -202,7 +202,6 @@ function nginx_ct_setup() {
     #if the ct nameis n8n, allow all ips
     if [ "$CT_NAME" = "n8n" ] || [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
         sed -i "/deny all;/i allow all;" "/etc/nginx/sites-available/${CT_NAME}"
-    fi
     else 
         for ip in $ALLOWED_IPS; do
             sed -i "/deny all;/i allow $ip;" "/etc/nginx/sites-available/${CT_NAME}"
