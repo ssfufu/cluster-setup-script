@@ -372,7 +372,7 @@ function create_container () {
         echo "Container name not in the list"
         exit 1
     fi
-    if [ -d "/var/lib/lxc/${container_name}"]; then
+    if [ -d "/var/lib/lxc/${container_name}" ]; then
         echo "Container named $container_name already exists"
         exit 1
     else
@@ -687,7 +687,7 @@ function create_container () {
             curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
             # Change the ports
             sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
-            # sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
+            sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
             docker compose up -d
             sleep 2
             nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
