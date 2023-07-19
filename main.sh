@@ -520,14 +520,26 @@ function create_container () {
         update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
 	    sleep 10
 
-        read -s "Please enter a password for the database: " db_password
+        echo ""
+        echo "--- Setting up PostgreSQL ---"
+        read -s -p "Please enter a password for the database: " db_password
+        echo ""
 
-	    echo "Creating database..."
-	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE DATABASE tolgee;\""
-	    echo "Creating user..."
-	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD '${db_password}';\""
-    	echo "Granting privileges..."
-	    lxc-attach $container_name -- bash -c " -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
+	    # echo "Creating database..."
+	    # lxc-attach $container_name -- bash -c "su postgres psql -c \"CREATE DATABASE tolgee;\""
+	    # echo "Creating user..."
+	    # lxc-attach $container_name -- bash -c "su postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD '${db_password}';\""
+    	# echo "Granting privileges..."
+	    # lxc-attach $container_name -- bash -c "su postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
+
+        echo "Creating database..."
+        lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE DATABASE tolgee;'\""
+
+        echo "Creating user..."
+        lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE USER tolgee WITH ENCRYPTED PASSWORD '\''${db_password}'\'';'\""
+
+        echo "Granting privileges..."
+        lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;'\""
 
 	    lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
         sleep 5
@@ -681,7 +693,7 @@ function create_container () {
         echo "cadvisor.$dom"
         ;;
     *)
-        echo "You can go to your site at: ${srv_name}'"
+        echo "You can go to your site at: ${srv_name}"
         ;;
     esac
     
