@@ -199,9 +199,16 @@ function nginx_ct_setup() {
         -e "/location \/ {/a deny all;" /root/cluster-setup-script/nginx/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
     
     # Add the allowed IPs
-    for ip in $ALLOWED_IPS; do
-        sed -i "/deny all;/i allow $ip;" "/etc/nginx/sites-available/${CT_NAME}"
-    done
+    #if the ct nameis n8n, allow all ips
+    if [ "$CT_NAME" = "n8n" ] || [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
+        sed -i "/deny all;/i allow all;" "/etc/nginx/sites-available/${CT_NAME}"
+    fi
+    else 
+        for ip in $ALLOWED_IPS; do
+            sed -i "/deny all;/i allow $ip;" "/etc/nginx/sites-available/${CT_NAME}"
+        done
+    fi
+
 
     # create a symlink to the sites-enabled directory
     ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/
@@ -688,7 +695,22 @@ function create_container () {
             sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
             docker compose up -d
             sleep 2
-            nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
+            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
+            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " appsmith_ips
+            nginx_ct_setup "localhost" "8000" "appsmith" $appsmith_ips
+            echo "Have you created a user at the site? (y/n)"
+            read -p "" user_created
+            if [ "$user_created" == "n" ]; then
+                echo "You can create a user at the site by going to https://appsmith.$dom"
+                echo "You can also create a user by running the following command: docker exec -it appsmith bash -c \"cd /appsmith && ./appsmith create-user --email <email> --password <password>\""
+            fi
+            else
+                #Remove the "deny all" from the nginx config file and add "allow all"
+                sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/appsmith
+                systemctl restart nginx.service
+                sleep 2
+            fi
+
 
             echo -e "Setup done\n"
             ;;
@@ -708,7 +730,7 @@ function create_container () {
             
             docker compose up -d
             sleep 5
-            nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
+            nginx_ct_setup "localhost" "5678" $container_name "1.1.1.1"
             ;;
         esac
     fi
