@@ -681,7 +681,7 @@ function create_container () {
         echo "cadvisor.$dom"
         ;;
     *)
-        echo "You can go to your site at: ${srv_name}'
+        echo "You can go to your site at: ${srv_name}'"
         ;;
     esac
     
