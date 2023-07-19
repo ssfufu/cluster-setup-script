@@ -702,7 +702,6 @@ function create_container () {
             if [ "$user_created" == "n" ]; then
                 echo "You can create a user at the site by going to https://appsmith.$dom"
                 echo "You can also create a user by running the following command: docker exec -it appsmith bash -c \"cd /appsmith && ./appsmith create-user --email <email> --password <password>\""
-            fi
             else
                 #Remove the "deny all" from the nginx config file and add "allow all"
                 sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/appsmith
