@@ -372,7 +372,7 @@ function create_container () {
         echo "Container name not in the list"
         exit 1
     fi
-    if [ -d "/var/lib/lxc/$container_name"]; then
+    if [ -d "/var/lib/lxc/${container_name}"]; then
         echo "Container named $container_name already exists"
         exit 1
     else
