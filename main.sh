@@ -697,6 +697,7 @@ function create_container () {
             cd /root/cluster-setup-script/n8n
             read -p "Enter the username: " n8n_username
             read -s -p "Enter the password: " n8n_password
+            echo ""
             read -p "Enter the mail address: " n8n_mail
 
             echo -e "Setting up n8n...\n"

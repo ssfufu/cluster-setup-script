@@ -1,16 +1,23 @@
 server {
-    #           sub.domain.dom
+    # sub.domain.dom
     server_name
 
     location / {
-        #          http://localhost:port;
+        # http://localhost:port;
         proxy_pass
         proxy_set_header Host
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        #                  http://localhost:port https://sub.domain.dom;
+        proxy_set_header X-Accel-Buffering no;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection '';
+        # http://localhost:port https://sub.domain.dom;
         proxy_redirect
+        chunked_transfer_encoding off;
+        proxy_buffering off;
+        proxy_cache off;
     }
 
     # Between the //, there is your sub.domain.dom directory
@@ -28,7 +35,7 @@ server {
 
 
     listen 80;
-    #           sub.domain.dom
+    # sub.domain.dom
     server_name
     return 404; # managed by Certbot
 
