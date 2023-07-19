@@ -362,7 +362,6 @@ function create_container () {
     echo "LXC containers: ${lxc_cts[*]}"
     echo ""
 
-
     read -p "Enter the container name: " container_name
     if [ -z "$container_name" ]; then
         echo "You must enter a container name"
@@ -372,6 +371,8 @@ function create_container () {
         echo "Container name not in the list"
         exit 1
     fi
+    dom="$(cat /root/domain.txt)"
+    srv_name="${container_name}.${dom}"
     if [ -d "/var/lib/lxc/${container_name}" ]; then
         echo "Container named $container_name already exists"
         exit 1
@@ -418,9 +419,6 @@ function create_container () {
                 echo "No available IP addresses found in the range $subnet.$range_start to $subnet.$range_end"
                 exit 1
             fi
-
-            dom="$(cat /root/domain.txt)"
-            srv_name="${container_name}.${dom}"
 
             echo ""
             echo "--------------------CREATING CONTAINER--------------------"
@@ -697,6 +695,16 @@ function create_container () {
 
         "n8n")
             cd /root/cluster-setup-script/n8n
+            read -p "Enter the username: " n8n_username
+            read -p -s "Enter the password: " n8n_password
+            read -p "Enter the mail address: " n8n_mail
+
+            echo -e "Setting up n8n...\n"
+            #Look at the .env and change the values with the inputs
+            sed -i "s/N8N_BASIC_AUTH_USER=.*/N8N_BASIC_AUTH_USER=$n8n_username/g" $PWD/.env
+            sed -i "s/SSL_EMAIL=.*/SSL_EMAIL=$n8n_mail/g" $PWD/.env
+            sed -i "s/N8N_BASIC_AUTH_PASSWORD=.*/N8N_BASIC_AUTH_PASSWORD=$n8n_password/g" $PWD/.env
+            
             docker compose up -d
             sleep 5
             nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
