@@ -362,7 +362,7 @@ function create_container () {
         exit 1
     fi
 
-    read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at ifconfig.me: " allowed_ips
+    read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
 
     # asks the user for the network interface the container will use, list the interfaces to choose from
     echo -e "\nThe following interfaces are available:"
