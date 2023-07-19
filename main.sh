@@ -524,14 +524,7 @@ function create_container () {
         echo "--- Setting up PostgreSQL ---"
         read -s -p "Please enter a password for the database: " db_password
         echo ""
-
-	    # echo "Creating database..."
-	    # lxc-attach $container_name -- bash -c "su postgres psql -c \"CREATE DATABASE tolgee;\""
-	    # echo "Creating user..."
-	    # lxc-attach $container_name -- bash -c "su postgres psql -c \"CREATE USER tolgee WITH ENCRYPTED PASSWORD '${db_password}';\""
-    	# echo "Granting privileges..."
-	    # lxc-attach $container_name -- bash -c "su postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;\""
-
+        
         echo "Creating database..."
         lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE DATABASE tolgee;'\""
 
@@ -696,6 +689,11 @@ function create_container () {
         echo "You can go to your site at: ${srv_name}"
         ;;
     esac
+    echo ""
+    echo -e "\e[31mThe container is ready but it might take a few moments to get the applications running\e[0m"
+    echo ""
+    echo "You can now run the script again to create another container"
+
     
     exit 0
 }
