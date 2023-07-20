@@ -624,6 +624,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
                 lxc-attach $container_name -- bash -c "systemctl restart nginx"
                 nginx_ct_setup $IP "80" $container_name $allowed_ips
+
                 ;;
             "nextcloud")
                 update_install_packages $container_name apache2 libapache2-mod-php mariadb-client unzip wget php-gd php-json php-mysql php-curl php-mbstring php-intl php-imagick php-xml php-zip
@@ -632,7 +633,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "echo 'deb https://packages.sury.org/php/ $(lsb_release -sc) main' > /etc/apt/sources.list.d/php.list"
                 lxc-attach $container_name -- apt-get update -y
                 # install php 8.2
-                lxc-attach $container_name -- bash -c "apt-get install php8.2 php8.2-cli php8.2-common php8.2-curl php8.2-mbstring php8.2-mysql php8.2-xml php8.2-zip php8.2-intl php8.2-imagick -y"
+                lxc-attach $container_name -- bash -c "apt-get install php8.2 php8.2-cli php8.2-common php8.2-curl php8.2-mbstring php8.2-mysql php8.2-xml php8.2-zip php8.2-intl php8.2-imagick php8.2-gd -y"
                 lxc-attach $container_name -- bash -c "a2enmod php8.2 && a2dismod php7.4"
                 lxc-attach $container_name -- bash -c "systemctl restart apache2"
                 _domain="$(cat /root/domain.txt)"
@@ -648,6 +649,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "systemctl restart apache2"
 
                 nginx_ct_setup $IP "80" $container_name $allowed_ips
+                systemctl restart nginx.service
                 ;;
                 
             "react")
