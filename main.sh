@@ -222,7 +222,7 @@ function nginx_ct_setup() {
         certbot certonly --standalone -d ${SERVER_NAME} --email ${MAIL} --agree-tos --no-eff-email --noninteractive --force-renewal
         
         systemctl start nginx
-    fis
+    fi
 
     systemctl restart nginx.service
 
