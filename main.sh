@@ -201,8 +201,10 @@ function nginx_ct_setup() {
     # Add the allowed IPs
     #if the ct nameis n8n, allow all ips
     if [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
+        echo "Allowing all IPs"
         sed -i "/deny all;/i allow all;" "/etc/nginx/sites-available/${CT_NAME}"
     else 
+        echo "Allowing only the specified IPs"
         for ip in $ALLOWED_IPS; do
             sed -i "/deny all;/i allow $ip;" "/etc/nginx/sites-available/${CT_NAME}"
         done
@@ -220,8 +222,9 @@ function nginx_ct_setup() {
         certbot certonly --standalone -d ${SERVER_NAME} --email ${MAIL} --agree-tos --no-eff-email --noninteractive --force-renewal
         
         systemctl start nginx
-    fi
-    
+    fis
+
+    systemctl restart nginx.service
 
 }
 
@@ -374,8 +377,8 @@ function user_ct_setup () {
         echo "You can create a user at the site by going to https://${container_name}.$dom"
     else
         sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/${container_name}
-        rm /etc/nginx/sites-enabled/${container_name} > /dev/null
-        ln -s /etc/nginx/sites-available/${container_name} /etc/nginx/sites-enabled/ > /dev/null
+        rm /etc/nginx/sites-enabled/${container_name}
+        ln -s /etc/nginx/sites-available/${container_name} /etc/nginx/sites-enabled/
         systemctl restart nginx.service
         sleep 2
     fi
