@@ -188,7 +188,7 @@ function nginx_ct_setup() {
     local dir_path="/etc/letsencrypt/live/${SERVER_NAME}"
 
     # deletes the file if already exists
-    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enable/$CT_NAME > /dev/null
+    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enabled/$CT_NAME > /dev/null
 
     # create a directory for this site if it doesn't exist
     touch /etc/nginx/sites-available/${CT_NAME} > /dev/null
@@ -317,7 +317,7 @@ function vps_setup_single () {
 
     docker run --restart=unless-stopped --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
     nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $allowed_ips
-    docker run --restart=unless-stopped -d -p 127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
+    docker run --restart=unless-stopped -d -p 127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter --name=node-exporter
 
     echo ""
     echo ""
