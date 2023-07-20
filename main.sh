@@ -709,14 +709,36 @@ function create_container () {
                 lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm"'
                 lxc-attach $container_name -- bash -c '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
 
+                sleep 5
                 lxc-attach $container_name -- bash -c "nvm install --lts"
+                sleep 2
                 lxc-attach $container_name -- bash -c "nvm use --lts"
+                sleep 2
                 lxc-attach $container_name -- bash -c "npm install -g cubejs-cli"
+                sleep 5
+                lxc-attach $container_name -- bash -c "npm install -g pm2"
+                sleep 5
                 lxc-attach $container_name -- bash -c "mkdir /root/cube"
-                lxc-attach $container_name -- bash -c "cd /root/cube && cubejs create cubejs-app"
+                cp /root/cluster-setup-script/cube/.env /var/lib/lxc/$container_name/rootfs/root/cube/.env
+                read -p "Enter the app name: " app_name
+                read -p "Enter the database name: " db_name
+                read -p "Enter the database username: " db_username
+                read -s -p "Enter the database password: " db_password
+                echo ""
+                sed -i "s/CUBEJS_DB_NAME=/CUBEJS_DB_NAME=$db_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
+                sed -i "s/CUBEJS_DB_USER=/CUBEJS_DB_USER=$db_username/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
+                sed -i "s/CUBEJS_DB_PASS=/CUBEJS_DB_PASS=$db_password/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
+                sed -i "s/CUBEJS_APP=/CUBEJS_APP=$app_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
+                echo "NODE_ENV=production" >> /var/lib/lxc/$container_name/rootfs/root/cube/.env
+
+                lxc-attach $container_name -- bash -c "cd /root/cube && cubejs create ${app_name}"
+                sleep 5
+                lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && npm run build"
+                sleep 30
+                lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run start"
 
                 sleep 10
-                nginx_ct_setup $IP "3000" $container_name $allowed_ips
+                nginx_ct_setup $IP "4000" $container_name $allowed_ips
                 ;;
             esac
 
