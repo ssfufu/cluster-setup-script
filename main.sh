@@ -359,6 +359,28 @@ function check_docker_container_exists() {
     fi
 }
 
+function user_ct_setup () {
+
+    local container_name="$1"
+    local dom="$(cat /root/domain.txt)"
+
+    echo ""
+    echo ""
+    echo "------------------------------------------------------------"
+    read -p "Have you created a user at the site? (y/n) " user_created
+    echo "------------------------------------------------------------"
+    echo ""
+    if [ "$user_created" == "n" ]; then
+        echo "You can create a user at the site by going to https://${container_name}.$dom"
+    else
+        sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/${container_name}
+        rm /etc/nginx/sites-enabled/${container_name}
+        ln -s /etc/nginx/sites-available/${container_name} /etc/nginx/sites-enabled/
+        systemctl restart nginx.service
+        sleep 2
+    fi
+}
+
 function create_container () {
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
     docker_cts=("n8n" "appsmith")
@@ -698,26 +720,10 @@ function create_container () {
             sleep 2
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
-            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " appsmith_ips
+            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
             echo ""
-            nginx_ct_setup "localhost" "8000" "appsmith" $appsmith_ips
-
-            echo ""
-            echo ""
-            echo "------------------------------------------------------------"
-            read -p "Have you created a user at the site? (y/n) " user_created
-            echo "------------------------------------------------------------"
-            echo ""
-            if [ "$user_created" == "n" ]; then
-                echo "You can create a user at the site by going to https://appsmith.$dom/welcome/setup"
-            else
-                sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/appsmith
-                rm /etc/nginx/sites-enabled/appsmith
-                ln -s /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/
-                systemctl restart nginx.service
-                sleep 2
-            fi
-
+            nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
+            user_ct_setup $container_name
 
             echo -e "Setup done\n"
             ;;
@@ -730,14 +736,19 @@ function create_container () {
             read -p "Enter the mail address: " n8n_mail
 
             echo -e "Setting up n8n...\n"
-            #Look at the .env and change the values with the inputs
             sed -i "s/N8N_BASIC_AUTH_USER=.*/N8N_BASIC_AUTH_USER=$n8n_username/g" $PWD/.env
             sed -i "s/SSL_EMAIL=.*/SSL_EMAIL=$n8n_mail/g" $PWD/.env
             sed -i "s/N8N_BASIC_AUTH_PASSWORD=.*/N8N_BASIC_AUTH_PASSWORD=$n8n_password/g" $PWD/.env
             
             docker compose up -d
-            sleep 5
-            nginx_ct_setup "localhost" "5678" $container_name "1.1.1.1"
+            echo ""
+            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
+            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " $allowed_ips
+            echo ""
+            nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
+            user_ct_setup $container_name
+
+            echo -e "Setup done\n"
             ;;
         esac
     fi
