@@ -391,7 +391,7 @@ function user_ct_setup () {
 function create_container () {
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
     docker_cts=("n8n" "appsmith")
-    lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react")
+    lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react" "cube")
     echo "The following containers are available:"
     echo "Docker containers: ${docker_cts[*]}"
     echo "LXC containers: ${lxc_cts[*]}"
@@ -402,7 +402,7 @@ function create_container () {
         echo "You must enter a container name"
         exit 1
     fi
-    if ! echo "monitoring tolgee appsmith n8n owncloud nextcloud react" | grep -w "$container_name" >/dev/null; then
+    if ! echo "monitoring tolgee appsmith n8n owncloud nextcloud react cube" | grep -w "$container_name" >/dev/null; then
         echo "Container name not in the list"
         exit 1
     fi
@@ -412,7 +412,7 @@ function create_container () {
         echo "Container named $container_name already exists"
         exit 1
     else
-        if echo "monitoring tolgee owncloud nextcloud react" | grep -w "$container_name" >/dev/null; then
+        if echo "monitoring tolgee owncloud nextcloud react cube" | grep -w "$container_name" >/dev/null; then
             read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
 
             # asks the user for the network interface the container will use, list the interfaces to choose from
