@@ -704,14 +704,16 @@ function create_container () {
 
             echo ""
             echo ""
+            echo "------------------------------------------------------------"
             read -p "Have you created a user at the site? (y/n) " user_created
+            echo "------------------------------------------------------------"
             echo ""
             if [ "$user_created" == "n" ]; then
-                echo "You can create a user at the site by going to https://appsmith.$dom"
-                echo "You can also create a user by running the following command: docker exec -it appsmith bash -c \"cd /appsmith && ./appsmith create-user --email <email> --password <password>\""
+                echo "You can create a user at the site by going to https://appsmith.$dom/welcome/setup"
             else
-                #Remove the "deny all" from the nginx config file and add "allow all"
                 sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/appsmith
+                rm /etc/nginx/sites-enabled/appsmith
+                ln -s /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/
                 systemctl restart nginx.service
                 sleep 2
             fi
@@ -756,7 +758,7 @@ function create_container () {
         ;;
     esac
     echo ""
-    echo -e "\e[31mThe container is ready but it might take a few moments to get the applications running\e[0m"
+    echo -e "\e[33mThe container is ready but it might take a few moments to get the applications running\e[0m"
     echo ""
     echo "You can now run the script again to create another container"
     
@@ -824,7 +826,7 @@ function reset_server () {
     echo "Deleting call docker containers..."
     docker stop $(docker ps -a -q)
     docker rm $(docker ps -a -q)
-    rm -rf /root/cluster-setup-script/appsmith
+    rm -rf /home/devops/appsmith
     rm -rf /home/devops/n8n
 
     echo "Reset done"
