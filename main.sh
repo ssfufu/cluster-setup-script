@@ -687,18 +687,25 @@ function create_container () {
         "appsmith")
             echo -e "Setting up appsmith...\n"
             mkdir /root/cluster-setup-script/appsmith
+            mkdir /home/devops/appsmith
             cd /root/cluster-setup-script/appsmith
             curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
             # Change the ports
             sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
             sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
+            sed -i 's/\.\/stacks:\/appsmith-stacks/\/home\/devops\/appsmith:\/appsmith-stacks/g' $PWD/docker-compose.yml
             docker compose up -d
             sleep 2
+            echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
             read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " appsmith_ips
+            echo ""
             nginx_ct_setup "localhost" "8000" "appsmith" $appsmith_ips
-            echo "Have you created a user at the site? (y/n)"
-            read -p "" user_created
+
+            echo ""
+            echo ""
+            read -p "Have you created a user at the site? (y/n) " user_created
+            echo ""
             if [ "$user_created" == "n" ]; then
                 echo "You can create a user at the site by going to https://appsmith.$dom"
                 echo "You can also create a user by running the following command: docker exec -it appsmith bash -c \"cd /appsmith && ./appsmith create-user --email <email> --password <password>\""
@@ -817,6 +824,8 @@ function reset_server () {
     echo "Deleting call docker containers..."
     docker stop $(docker ps -a -q)
     docker rm $(docker ps -a -q)
+    rm -rf /root/cluster-setup-script/appsmith
+    rm -rf /home/devops/n8n
 
     echo "Reset done"
     echo "You can now run the script again to setup the server"
