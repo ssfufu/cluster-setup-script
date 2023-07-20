@@ -184,10 +184,10 @@ function nginx_ct_setup() {
     local dir_path="/etc/letsencrypt/live/${SERVER_NAME}"
 
     # deletes the file if already exists
-    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enable/$CT_NAME
+    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enable/$CT_NAME > /dev/null
 
     # create a directory for this site if it doesn't exist
-    touch /etc/nginx/sites-available/${CT_NAME}
+    touch /etc/nginx/sites-available/${CT_NAME} > /dev/null
 
     # substitute placeholders with variable values in the template and create a new config file
     sed -e "s#server_name#server_name ${SERVER_NAME};#g" \
