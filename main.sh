@@ -153,6 +153,9 @@ function lxc_lxd_setup () {
     snap install lxd > /dev/null
     sleep 2
 
+    systemctl enable snap.lxd.daemon.service
+    systemctl start snap.lxd.daemon.service
+
     adduser devops lxd
     lxd init --preseed - < /root/cluster-setup-script/lxd_init.yaml
 
@@ -497,7 +500,9 @@ function create_container () {
             #replaces the container's rootfs with the network file
             echo "Replacing container's rootfs with the network file"
             mv /tmp/10-eth0.network /var/lib/lxc/$container_name/rootfs/etc/systemd/network/10-eth0.network
-
+            echo "lxc.start.auto = 1" >> /var/lib/lxc/$container_name/config
+            echo "lxc.start.delay = 5" >> /var/lib/lxc/$container_name/config
+            
             lxc-start -n $container_name
             sleep 2
             lxc-attach $container_name -- hostnamectl set-hostname $container_name
