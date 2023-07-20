@@ -706,14 +706,9 @@ function create_container () {
                 update_install_packages $container_name
                 # install nodejs latest version
                 lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
-                lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm"'
-                lxc-attach $container_name -- bash -c '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+                lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && nvm install --lts && nvm use --lts'
 
                 sleep 5
-                lxc-attach $container_name -- bash -c "nvm install --lts"
-                sleep 2
-                lxc-attach $container_name -- bash -c "nvm use --lts"
-                sleep 2
                 lxc-attach $container_name -- bash -c "npm install -g cubejs-cli"
                 sleep 5
                 lxc-attach $container_name -- bash -c "npm install -g pm2"
