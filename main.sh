@@ -739,10 +739,7 @@ function create_container () {
             read -p "Enter the mail address: " n8n_mail
 
             echo -e "Setting up n8n...\n"
-            sed -i "s/N8N_BASIC_AUTH_USER=.*/N8N_BASIC_AUTH_USER=$n8n_username/g" $PWD/.env
-            sed -i "s/SSL_EMAIL=.*/SSL_EMAIL=$n8n_mail/g" $PWD/.env
-            sed -i "s/N8N_BASIC_AUTH_PASSWORD=.*/N8N_BASIC_AUTH_PASSWORD=$n8n_password/g" $PWD/.env
-            
+
             docker compose up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
