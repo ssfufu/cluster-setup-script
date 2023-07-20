@@ -200,7 +200,7 @@ function nginx_ct_setup() {
     
     # Add the allowed IPs
     #if the ct nameis n8n, allow all ips
-    if [ "$CT_NAME" = "n8n" ] || [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
+    if [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
         sed -i "/deny all;/i allow all;" "/etc/nginx/sites-available/${CT_NAME}"
     else 
         for ip in $ALLOWED_IPS; do
@@ -210,7 +210,7 @@ function nginx_ct_setup() {
 
 
     # create a symlink to the sites-enabled directory
-    ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/
+    ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/ > /dev/null
 
     if [ -d "$dir_path" ]; then
         echo "There already is a certificate for that."
@@ -374,8 +374,8 @@ function user_ct_setup () {
         echo "You can create a user at the site by going to https://${container_name}.$dom"
     else
         sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/${container_name}
-        rm /etc/nginx/sites-enabled/${container_name}
-        ln -s /etc/nginx/sites-available/${container_name} /etc/nginx/sites-enabled/
+        rm /etc/nginx/sites-enabled/${container_name} > /dev/null
+        ln -s /etc/nginx/sites-available/${container_name} /etc/nginx/sites-enabled/ > /dev/null
         systemctl restart nginx.service
         sleep 2
     fi
