@@ -746,7 +746,7 @@ function create_container () {
             docker compose up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
-            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " $allowed_ips
+            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
             echo ""
             nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
             user_ct_setup $container_name
