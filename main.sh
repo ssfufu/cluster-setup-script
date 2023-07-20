@@ -702,7 +702,22 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "pm2 startup"
                 lxc-attach $container_name -- bash -c "systemctl restart pm2-root"
                 ;;
+            "cube")
+                update_install_packages $container_name
+                # install nodejs latest version
+                lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
+                lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm"'
+                lxc-attach $container_name -- bash -c '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
 
+                lxc-attach $container_name -- bash -c "nvm install --lts"
+                lxc-attach $container_name -- bash -c "nvm use --lts"
+                lxc-attach $container_name -- bash -c "npm install -g cubejs-cli"
+                lxc-attach $container_name -- bash -c "mkdir /root/cube"
+                lxc-attach $container_name -- bash -c "cd /root/cube && cubejs create cubejs-app"
+
+                sleep 10
+                nginx_ct_setup $IP "3000" $container_name $allowed_ips
+                ;;
             esac
 
             sleep 3
