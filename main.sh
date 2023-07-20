@@ -710,24 +710,24 @@ function create_container () {
                 echo -e "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash\n export NVM_DIR=\"\$HOME/.nvm\"\n[ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"\nnvm install --lts\nnvm use --lts\nnpm install -g cubejs-cli\nnpm install -g pm2" > /var/lib/lxc/$container_name/rootfs/root/cube_script.sh
                 lxc-attach $container_name -- bash -c "chmod +x /root/cube_script.sh"
                 lxc-attach $container_name -- bash -c "/root/cube_script.sh"
-                
+
                 lxc-attach $container_name -- bash -c "mkdir /root/cube"
-                cp /root/cluster-setup-script/cube/.env /var/lib/lxc/$container_name/rootfs/root/cube/.env
                 read -p "Enter the app name: " app_name
                 read -p "Enter the database name: " db_name
                 read -p "Enter the database username: " db_username
                 read -s -p "Enter the database password: " db_password
                 echo ""
-                sed -i "s/CUBEJS_DB_NAME=/CUBEJS_DB_NAME=$db_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
-                sed -i "s/CUBEJS_DB_USER=/CUBEJS_DB_USER=$db_username/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
-                sed -i "s/CUBEJS_DB_PASS=/CUBEJS_DB_PASS=$db_password/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
-                sed -i "s/CUBEJS_APP=/CUBEJS_APP=$app_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/.env
-                echo "NODE_ENV=production" >> /var/lib/lxc/$container_name/rootfs/root/cube/.env
 
                 lxc-attach $container_name -- bash -c "cd /root/cube && cubejs create ${app_name}"
                 sleep 5
-                lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && npm run build"
-                sleep 30
+                cp /root/cluster-setup-script/cube/.env /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
+                sed -i "s/CUBEJS_DB_NAME=/CUBEJS_DB_NAME=$db_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
+                sed -i "s/CUBEJS_DB_USER=/CUBEJS_DB_USER=$db_username/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
+                sed -i "s/CUBEJS_DB_PASS=/CUBEJS_DB_PASS=$db_password/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
+                sed -i "s/CUBEJS_APP=/CUBEJS_APP=$app_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
+                echo "NODE_ENV=production" >> /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
+                lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && npm install && npm update && npm run build"
+                sleep 5
                 lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run start"
 
                 sleep 10
