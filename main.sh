@@ -706,13 +706,11 @@ function create_container () {
                 update_install_packages $container_name
                 # install nodejs latest version
                 lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
-                lxc-attach $container_name -- bash -c 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && nvm install --lts && nvm use --lts'
-
-                sleep 5
-                lxc-attach $container_name -- bash -c "npm install -g cubejs-cli"
-                sleep 5
-                lxc-attach $container_name -- bash -c "npm install -g pm2"
-                sleep 5
+                touch /var/lib/lxc/$container_name/rootfs/root/cube_script.sh
+                echo -e "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash\n export NVM_DIR=\"\$HOME/.nvm\"\n[ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"\nnvm install --lts\nnvm use --lts\nnpm install -g cubejs-cli\nnpm install -g pm2" > /var/lib/lxc/$container_name/rootfs/root/cube_script.sh
+                lxc-attach $container_name -- bash -c "chmod +x /root/cube_script.sh"
+                lxc-attach $container_name -- bash -c "/root/cube_script.sh"
+                
                 lxc-attach $container_name -- bash -c "mkdir /root/cube"
                 cp /root/cluster-setup-script/cube/.env /var/lib/lxc/$container_name/rootfs/root/cube/.env
                 read -p "Enter the app name: " app_name
