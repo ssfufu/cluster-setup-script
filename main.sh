@@ -83,8 +83,8 @@ function backup_server () {
 
     echo "Backup script generated: $backup_script"
 
-    # Add a cron job to run the backup script
-    (crontab -l 2>/dev/null; echo "0 */${remote_freq} * * * ${backup_script}") | crontab -
+    echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup_${remote_name}.sh"
+
 
     echo "Cron job added to run the backup script every ${remote_freq} hours"
 
@@ -915,6 +915,12 @@ function reset_server () {
     docker rm $(docker ps -a -q)
     rm -rf /home/devops/appsmith
     rm -rf /home/devops/n8n
+
+    # remove the cronjob in the cron -e and script of the backup
+    echo "Deleting backup script and cronjob..."
+    rm /root/cluster-setup-script/backup.sh
+    crontab -l | grep -v '/root/cluster-setup-script/backup.sh'  | crontab - > /dev/null
+
 
     echo "Reset done"
     echo "You can now run the script again to setup the server"
