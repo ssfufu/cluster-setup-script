@@ -54,15 +54,18 @@ function backup_server () {
     ssh-keygen -t rsa -b 4096 -f "${home_dir}/.ssh/${remote_name}_rsa" -N ""
 
     # Print instructions to copy the public key to the remote server
+    echo ""
+    echo "--------------------INSTRUCTIONS--------------------"
+    echo "SSH key pair generated: ${home_dir}/.ssh/${remote_name}_rsa"
     echo "To set up passwordless authentication, copy the public key to the remote server with this command:"
-    echo "ssh-copy-id -i ${home_dir}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip} -p ${remote_port}"
-
+    echo "ssh-copy-id -p ${remote_port} -i ${home_dir}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip}"
+    echo "--------------------INSTRUCTIONS--------------------"
+    echo ""
     # Generate backup script
     backup_script="${home_dir}/backup_${remote_name}.sh"
     touch "$backup_script" && chmod +x "$backup_script"
     echo "#!/bin/bash" > "$backup_script"
 
-    # Write commands to perform backup
     echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/var/lib/lxd\" \"/var/lib/docker\")" >> "$backup_script"
     echo "for dir in \"\${dirs_to_backup[@]}\"; do" >> "$backup_script"
     if [ "$remote_compression" = "y" ]; then
