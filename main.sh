@@ -254,7 +254,7 @@ function nginx_setup() {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
     ip_self=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-    read -p "What is the IP tou want to allow " IP_nginx
+    read -p "What is the IP you want to allow " IP_nginx
 
     rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
@@ -264,6 +264,8 @@ function nginx_setup() {
                     allow $IP_nginx;" /etc/nginx/nginx.conf
     sed -i "/allow $IP_nginx;/a \\\n\
                     allow 10.128.151.0/24;" /etc/nginx/nginx.conf
+    sed -i "/allow 10.128.151.0/24;/a \\\n\
+                    allow 10.128.152.0/24;" /etc/nginx/nginx.conf
 
     
     rm /etc/nginx/sites-available/default
@@ -317,7 +319,7 @@ function vps_setup_single () {
     echo $mail_user > /root/mail.txt
     local IP_server=$(curl -s ifconfig.me)
 
-    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
+    read -p "What IP(S) do you want to allow for cAdvisor? (Separated by a space) " allowed_ips
 
     nginx_setup
     lxc_lxd_setup
