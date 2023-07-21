@@ -882,14 +882,14 @@ function reset_server () {
     snap remove lxd
 
     echo "Deleting nginx config files..."
-    rm /etc/nginx/sites-available/cadvisor /etc/nginx/sites-enabled/cadvisor
-    rm /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins
-    rm /etc/nginx/sites-available/prometheus /etc/nginx/sites-enabled/prometheus
-    rm /etc/nginx/sites-available/grafana /etc/nginx/sites-enabled/grafana
-    rm /etc/nginx/sites-available/tolgee /etc/nginx/sites-enabled/tolgee
-    rm /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/appsmith
-    rm /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/n8n
-    rm /etc/nginx/sites-available/owncloud /etc/nginx/sites-enabled/owncloud
+    rm /etc/nginx/sites-available/cadvisor /etc/nginx/sites-enabled/cadvisor > /dev/null
+    rm /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins > /dev/null
+    rm /etc/nginx/sites-available/prometheus /etc/nginx/sites-enabled/prometheus > /dev/null
+    rm /etc/nginx/sites-available/grafana /etc/nginx/sites-enabled/grafana > /dev/null
+    rm /etc/nginx/sites-available/tolgee /etc/nginx/sites-enabled/tolgee > /dev/null
+    rm /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/appsmith > /dev/null
+    rm /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/n8n > /dev/null
+    rm /etc/nginx/sites-available/owncloud /etc/nginx/sites-enabled/owncloud > /dev/null
 
     echo "Deleting environment files..."
     rm /root/domain.txt
