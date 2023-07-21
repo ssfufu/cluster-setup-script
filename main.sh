@@ -917,8 +917,7 @@ function reset_server () {
 
     # remove the cronjob in the cron -e and script of the backup
     echo "Deleting backup script and cronjob..."
-    rm /root/cluster-setup-script/backup.sh
-    crontab -l | grep -v '/root/cluster-setup-script/backup.sh'  | crontab - > /dev/null
+    rm /etc/cron.d/backup_*
 
 
     echo "Reset done"
