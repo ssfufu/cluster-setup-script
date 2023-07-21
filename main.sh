@@ -14,18 +14,16 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
 fi
 
 function backup_server () {
-
     echo "--------------------BACKUP SERVER--------------------"
     echo "This will backup the server and containers to a remote server every hour"
-
+    
     read -p "Do you want to implement a backup function to the server? (y/n): " backup_server
-    #if the user does not want to backup the server, exit the function and not the script
     if [ "$backup_server" = "n" ]; then
         echo "Skipping backup server"
         return
     fi
 
-    # Get user inputs
+    read -p "Enter the remote server's password: " remote_password
     read -p "Enter the remote server's IP address: " remote_ip
     read -p "Enter the remote server's username: " remote_username
     read -p "Enter the remote server's ssh port: " remote_port
@@ -36,6 +34,9 @@ function backup_server () {
     read -p "Enter the remote server's backup retention (in days): " remote_retention
     read -p "Enter the remote server's backup compression (y/n): " remote_compression
     read -p "Do you also want to transfer the backups to an FTP server? (y/n): " ftp_transfer
+
+    logfile="/var/log/backup_${remote_name}.log"
+    error_logfile="/var/log/backup_${remote_name}_error.log"
 
     if [ "$ftp_transfer" = "y" ]; then
         read -p "Enter the FTP server's IP address: " ftp_ip
@@ -50,48 +51,42 @@ function backup_server () {
         home_dir="/home/${USER}"
     fi
 
-    # Generate SSH key pair for passwordless authentication
-    ssh-keygen -t rsa -b 4096 -f "${home_dir}/.ssh/${remote_name}_rsa" -N ""
+    ssh-keygen -t rsa -b 4096 -f "${home_dir}/.ssh/${remote_name}_rsa" -N "" |& tee -a $logfile
+    echo "SSH key pair generated: ${home_dir}/.ssh/${remote_name}_rsa" | tee -a $logfile
 
-    # Print instructions to copy the public key to the remote server
-    echo ""
-    echo "--------------------INSTRUCTIONS--------------------"
-    echo "SSH key pair generated: ${home_dir}/.ssh/${remote_name}_rsa"
-    echo "To set up passwordless authentication, copy the public key to the remote server with this command:"
-    echo "ssh-copy-id -p ${remote_port} -i ${home_dir}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip}"
-    echo "--------------------INSTRUCTIONS--------------------"
-    echo ""
-    # Generate backup script
+    echo "Trying to copy the public key to the remote server..." | tee -a $logfile
+    sshpass -p "$remote_password" ssh-copy-id -p "${remote_port}" -i "${home_dir}/.ssh/${remote_name}_rsa.pub" "${remote_username}@${remote_ip}" |& tee -a $logfile
+
     backup_script="${home_dir}/backup_${remote_name}.sh"
-    touch "$backup_script" && chmod +x "$backup_script"
-    echo "#!/bin/bash" > "$backup_script"
+    touch $backup_script && chmod +x $backup_script
+    touch $logfile
+    touch $error_logfile
 
+    echo "#!/bin/bash" > $backup_script
     echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/var/lib/lxd\" \"/var/lib/docker\")" >> "$backup_script"
     echo "for dir in \"\${dirs_to_backup[@]}\"; do" >> "$backup_script"
+
     if [ "$remote_compression" = "y" ]; then
-        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
-        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\" 2>> $error_logfile" >> "$backup_script"
+        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
         if [ "$ftp_transfer" = "y" ]; then
-            echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/" >> "$backup_script"
+            echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
         fi
     else
-        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
     fi
     echo "done" >> "$backup_script"
 
-    # Add backup retention logic
-    echo "find \"${remote_dir}\" -name \"${remote_name}*${remote_ext}\" -type f -mtime +${remote_retention} -delete" >> "$backup_script"
+    echo "find \"${remote_dir}\" -name \"${remote_name}*${remote_ext}\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
 
-    echo "Backup script generated: $backup_script"
+    echo "Backup script generated: $backup_script" | tee -a $logfile
 
     echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup_${remote_name}.sh"
     chmod 600 "/etc/cron.d/backup_${remote_name}.sh"
 
-
-    echo "Cron job added to run the backup script every ${remote_freq} hours"
-
-
+    echo "Cron job added to run the backup script every ${remote_freq} hours" | tee -a $logfile
 }
+
 
 function docker_setup () {
     echo ""
@@ -594,15 +589,18 @@ function create_container () {
                 echo "    static_configs:" >> $file_name
                 echo "      - targets: ['$gateway:8899']" >> $file_name
 
-                lxc-attach $container_name -- bash -c "wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key"
-                lxc-attach $container_name -- bash -c "echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list"
-                lxc-attach $container_name -- apt-get update -y > /dev/null
-                sleep 5
-                lxc-attach $container_name -- apt-get install grafana -y > /dev/null
-                sleep 5
-                lxc-attach $container_name -- systemctl daemon-reload
-                lxc-attach $container_name -- systemctl start grafana-server
-                lxc-attach $container_name -- systemctl enable grafana-server.service
+                touch /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "#!/bin/bash" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "echo 'deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main' | tee -a /etc/apt/sources.list.d/grafana.list" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "apt-get update -y" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "apt-get install grafana -y" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "systemctl daemon-reload" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "systemctl start grafana-server" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+                echo "systemctl enable grafana-server.service" >> /var/lib/lxc/$container_name/rootfs/root/grafana.sh
+
+                lxc-attach $container_name -- bash -c "chmod +x /root/grafana.sh"
+                lxc-attach $container_name -- bash -c "/root/grafana.sh"
 
                 nginx_ct_setup $IP "3000" $container_name $allowed_ips
                 ;;
