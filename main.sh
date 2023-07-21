@@ -18,6 +18,13 @@ function backup_server () {
     echo "--------------------BACKUP SERVER--------------------"
     echo "This will backup the server and containers to a remote server every hour"
 
+    read -p "Do you want to implement a backup function to the server? (y/n): " backup_server
+    #if the user does not want to backup the server, exit the function and not the script
+    if [ "$backup_server" = "n" ]; then
+        echo "Skipping backup server"
+        return
+    fi
+
     # Get user inputs
     read -p "Enter the remote server's IP address: " remote_ip
     read -p "Enter the remote server's username: " remote_username
@@ -304,6 +311,7 @@ function vps_setup_single () {
     read -p "What is your e-mail? " mail_user
     touch /root/mail.txt
     echo $mail_user > /root/mail.txt
+    local IP_server=$(curl -s ifconfig.me)
 
     read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
 
@@ -323,11 +331,31 @@ function vps_setup_single () {
     echo ""
     echo "--------------------CADVISOR INSTALLED--------------------"
 
+    echo ""
+    echo ""
+    echo "--------------------INSTALLING WIREGUARD SERVER--------------------"
     wireguard_setup
+    echo ""
+    echo ""
+    echo "--------------------WIREGUARD SERVER INSTALLED--------------------"
 
+    echo ""
+    echo ""
+    echo "--------------------SETTING UP SSH--------------------"
     systemctl restart nginx.service
-    sed -i "s/#Port 22/Port 6845/g" /etc/ssh/sshd_config
+    read -p "What is your IP? " IP_user
+    rm /etc/ssh/sshd_config
+    cp /root/cluster-setup-script/ssh/sshd_config /etc/ssh/sshd_config
+    touch /etc/hosts.allow
+    echo "sshd: 10.66.66." > /etc/hosts.allow
+    echo "sshd: ${IP_user}" >> /etc/hosts.allow
+    touch /etc/hosts.deny
+    echo "sshd: ALL" > /etc/hosts.deny
     systemctl restart sshd.service
+    echo ""
+    echo -e "\e[31mWarning: you will ABSOLUTELY have to be connected to the VPN to ssh to this server OR connect from ${IP_user} \e[0m"
+    echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@10.66.66.1 or ssh -p 6845 devops@${IP_server}\e[0m"
+
 
     echo ""
     echo "--------------------BACKUP SETUP--------------------"
@@ -510,6 +538,7 @@ function create_container () {
             sed -i '/127.0.0.1/c\127.0.0.1 '${container_name} /var/lib/lxc/$container_name/rootfs/etc/hosts
             lxc-attach $container_name -- bash -c "echo $container_name > /etc/hostname"
             lxc-stop -n $container_name
+            sleep 5
             lxc-start -n $container_name
 
             sleep 5
@@ -522,6 +551,7 @@ function create_container () {
             sleep 5
             lxc-stop -n $container_name
             lxc-autostart -n $container_name
+            sleep 5
             lxc-start -n $container_name
 
             echo ""
