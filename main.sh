@@ -349,7 +349,7 @@ function vps_setup_single () {
     systemctl restart nginx.service
     read -p "What is your IP? " IP_user
     rm /etc/ssh/sshd_config
-    cp /root/cluster-setup-script/ssh/sshd_config /etc/ssh/sshd_config
+    cp /root/cluster-setup-script/ssh/sshd_config_template /etc/ssh/sshd_config
     touch /etc/hosts.allow
     echo "sshd: 10.66.66." > /etc/hosts.allow
     echo "sshd: ${IP_user}" >> /etc/hosts.allow
@@ -849,7 +849,6 @@ function create_container () {
 }
 
 function reset_server () {
-    # echo a warning in red color
     echo -e "\e[31mWARNING: This will delete all containers, networks, nginx config files, environment files and wireguard\e[0m"
     echo -e "\e[31m         It will also stop and remove all docker containers, images, volumes and networks\e[0m"
     echo -e "\e[31m         Make sure to backup your system\e[0m"
@@ -866,7 +865,6 @@ function reset_server () {
     echo "Resetting server..."
 
     echo "Deleting containers..."
-    # Make a for loop to remove all containers lxc that match the names in this script
     for i in monitoring tolgee owncloud nextcloud; do
         if [ -d "/var/lib/lxc/$i" ]; then
             echo "Deleting container $i"
@@ -879,7 +877,6 @@ function reset_server () {
     lxc network delete DMZ
     lxc network delete DMZ2
 
-    # Delete lxd and lxc
     echo "Deleting lxd and lxc..."
     apt-get remove -y lxc
     snap remove lxd
