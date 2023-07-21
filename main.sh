@@ -59,6 +59,7 @@ function backup_server () {
 
     # Generate backup script
     backup_script="${home_dir}/backup_${remote_name}.sh"
+    touch "$backup_script" && chmod +x "$backup_script"
     echo "#!/bin/bash" > "$backup_script"
 
     # Write commands to perform backup
@@ -78,12 +79,10 @@ function backup_server () {
     # Add backup retention logic
     echo "find \"${remote_dir}\" -name \"${remote_name}*${remote_ext}\" -type f -mtime +${remote_retention} -delete" >> "$backup_script"
 
-    # Set execute permission on the script
-    chmod +x "$backup_script"
-
     echo "Backup script generated: $backup_script"
 
     echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup_${remote_name}.sh"
+    chmod 600 "/etc/cron.d/backup_${remote_name}.sh"
 
 
     echo "Cron job added to run the backup script every ${remote_freq} hours"
