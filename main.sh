@@ -865,7 +865,7 @@ function reset_server () {
     echo "Resetting server..."
 
     echo "Deleting containers..."
-    for i in monitoring tolgee owncloud nextcloud; do
+    for i in monitoring tolgee owncloud nextcloud react cube; do
         if [ -d "/var/lib/lxc/$i" ]; then
             echo "Deleting container $i"
             lxc-stop -n $i
