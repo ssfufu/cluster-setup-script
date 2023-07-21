@@ -15,7 +15,6 @@ fi
 
 function backup_server () {
     echo "--------------------BACKUP SERVER--------------------"
-    echo "This will backup the server and containers to a remote server every hour"
     
     read -p "Do you want to implement a backup function to the server? (y/n): " backup_server
     if [ "$backup_server" = "n" ]; then
@@ -23,9 +22,9 @@ function backup_server () {
         return
     fi
 
-    read -p "Enter the remote server's password: " remote_password
     read -p "Enter the remote server's IP address: " remote_ip
     read -p "Enter the remote server's username: " remote_username
+    read -s -p "Enter the remote server's password: " remote_password
     read -p "Enter the remote server's ssh port: " remote_port
     read -p "Enter the remote server's backup directory: " remote_dir
     read -p "Enter the remote server's backup name: " remote_name
@@ -67,18 +66,17 @@ function backup_server () {
     echo "for dir in \"\${dirs_to_backup[@]}\"; do" >> "$backup_script"
 
     if [ "$remote_compression" = "y" ]; then
-        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\" 2>> $error_logfile" >> "$backup_script"
-        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
+        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
+        echo "  scp -i ${home_dir}/.ssh/${remote_name}_rsa -P $remote_port \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
         if [ "$ftp_transfer" = "y" ]; then
-            echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
+            echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/" >> "$backup_script"
         fi
     else
-        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
+        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
+        echo "  scp -i ${home_dir}/.ssh/${remote_name}_rsa -P $remote_port \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
     fi
+
     echo "done" >> "$backup_script"
-
-    echo "find \"${remote_dir}\" -name \"${remote_name}*${remote_ext}\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
-
     echo "Backup script generated: $backup_script" | tee -a $logfile
 
     echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup_${remote_name}.sh"
@@ -322,6 +320,7 @@ function vps_setup_single () {
     local IP_server=$(curl -s ifconfig.me)
 
     read -p "What IP(S) do you want to allow for cAdvisor? (Separated by a space) " allowed_ips
+    apt install sshpass -y
 
     nginx_setup
     lxc_lxd_setup
