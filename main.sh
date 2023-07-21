@@ -28,14 +28,13 @@ function backup_server () {
     # Get user inputs
     read -p "Enter the remote server's IP address: " remote_ip
     read -p "Enter the remote server's username: " remote_username
-    read -p "Enter the remote server's port: " remote_port
+    read -p "Enter the remote server's ssh port: " remote_port
     read -p "Enter the remote server's backup directory: " remote_dir
     read -p "Enter the remote server's backup name: " remote_name
     read -p "Enter the remote server's backup extension: " remote_ext
     read -p "Enter the remote server's backup frequency (in hours): " remote_freq
     read -p "Enter the remote server's backup retention (in days): " remote_retention
     read -p "Enter the remote server's backup compression (y/n): " remote_compression
-    read -p "Enter the remote server's backup encryption (y/n): " remote_encryption
     read -p "Do you also want to transfer the backups to an FTP server? (y/n): " ftp_transfer
 
     if [ "$ftp_transfer" = "y" ]; then
@@ -45,15 +44,21 @@ function backup_server () {
         read -p "Enter the FTP server's backup directory: " ftp_dir
     fi
 
+    if [ $USER = "root" ]; then
+        home_dir="/root"
+    else
+        home_dir="/home/${USER}"
+    fi
+
     # Generate SSH key pair for passwordless authentication
-    ssh-keygen -t rsa -b 4096 -f "/home/${USER}/.ssh/${remote_name}_rsa" -N ""
+    ssh-keygen -t rsa -b 4096 -f "${home_dir}/.ssh/${remote_name}_rsa" -N ""
 
     # Print instructions to copy the public key to the remote server
     echo "To set up passwordless authentication, copy the public key to the remote server with this command:"
-    echo "ssh-copy-id -i /home/${USER}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip} -p ${remote_port}"
+    echo "ssh-copy-id -i ${home_dir}/.ssh/${remote_name}_rsa.pub ${remote_username}@${remote_ip} -p ${remote_port}"
 
     # Generate backup script
-    backup_script="/home/${USER}/backup_${remote_name}.sh"
+    backup_script="${home_dir}/backup_${remote_name}.sh"
     echo "#!/bin/bash" > "$backup_script"
 
     # Write commands to perform backup
@@ -61,12 +66,12 @@ function backup_server () {
     echo "for dir in \"\${dirs_to_backup[@]}\"; do" >> "$backup_script"
     if [ "$remote_compression" = "y" ]; then
         echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
-        echo "  rsync -avz -e \"ssh -i /home/${USER}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
         if [ "$ftp_transfer" = "y" ]; then
             echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/" >> "$backup_script"
         fi
     else
-        echo "  rsync -avz -e \"ssh -i /home/${USER}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+        echo "  rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\$dir\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
     fi
     echo "done" >> "$backup_script"
 
