@@ -141,6 +141,10 @@ function wireguard_setup () {
     mkdir wireguard_script && cd wireguard_script
     curl -O https://raw.githubusercontent.com/angristan/wireguard-install/master/wireguard-install.sh
     chmod +x wireguard-install.sh
+    echo ""
+    echo -e "\e[31mWarning: Just press enter, to get the default config. This is important for the SSH config.\e[0m"
+    echo ""
+    sleep 5
     ./wireguard-install.sh
     systemctl restart wg-quick@wg0.service
 
