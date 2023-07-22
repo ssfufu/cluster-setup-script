@@ -14,11 +14,11 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
 fi
 
 function backup_server () {
-    echo "--------------------BACKUP SERVER--------------------"
-    
+    echo "--------------------BACKUP SERVER--------------------" | tee -a $logfile
+
     read -p "Do you want to implement a backup function to the server? (y/n): " backup_server
     if [ "$backup_server" = "n" ]; then
-        echo "Skipping backup server"
+        echo "Skipping backup server" | tee -a $logfile
         return
     fi
 
@@ -62,6 +62,8 @@ function backup_server () {
     touch $error_logfile
 
     echo "#!/bin/bash" > $backup_script
+    echo "current_time=\$(date +\"%d.%m.%Y_%H:%M\")" >> "$backup_script"
+    echo "echo \"\${current_time}: Starting backup\" >> $logfile" >> "$backup_script"
 
     # Stop all running Docker and LXC containers
     echo "docker stop \$(docker ps -q)" >> "$backup_script"
@@ -92,6 +94,7 @@ function backup_server () {
 
     echo "Cron job added to run the backup script every ${remote_freq} hours" | tee -a $logfile
 }
+
 
 function docker_setup () {
     echo ""
