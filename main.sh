@@ -927,7 +927,7 @@ function reset_server () {
 
     # remove the cronjob in the cron -e and script of the backup
     echo "Deleting backup script and cronjob..."
-    rm /etc/cron.d/backup_*
+    rm /etc/cron.d/backup*
     rm /root/backup*.sh
 
 
