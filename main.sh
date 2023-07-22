@@ -62,21 +62,28 @@ function backup_server () {
     touch $error_logfile
 
     echo "#!/bin/bash" > $backup_script
-    echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/var/lib/lxd\" \"/var/lib/docker\")" >> "$backup_script"
-    echo "for dir in \"\${dirs_to_backup[@]}\"; do" >> "$backup_script"
 
-    if [ "$remote_compression" = "y" ]; then
-        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
-        echo "  scp -i ${home_dir}/.ssh/${remote_name}_rsa -P $remote_port \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
-        if [ "$ftp_transfer" = "y" ]; then
-            echo "  curl -T \"${remote_name}.tar.gz\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/" >> "$backup_script"
-        fi
-    else
-        echo "  tar -czf \"${remote_name}.tar.gz\" \"\$dir\"" >> "$backup_script"
-        echo "  scp -i ${home_dir}/.ssh/${remote_name}_rsa -P $remote_port \"${remote_name}.tar.gz\" \"${remote_username}@${remote_ip}:${remote_dir}/\"" >> "$backup_script"
+    # Stop all running Docker and LXC containers
+    echo "docker stop \$(docker ps -q)" >> "$backup_script"
+    echo "for container in \$(lxc-ls); do lxc-stop -n \"\$container\"; done" >> "$backup_script"
+
+    echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/var/lib/docker\" \"/home/devops\")" >> "$backup_script"
+    echo "current_date=\$(date +%Y%m%d)" >> "$backup_script"
+    echo "tarball_name=\"${remote_name}_\${current_date}.tar.gz\"" >> "$backup_script"
+    echo "tar -czf \"\${tarball_name}\" \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
+    echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
+
+    if [ "$ftp_transfer" = "y" ]; then
+        echo "curl -T \"\${tarball_name}\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
     fi
 
-    echo "done" >> "$backup_script"
+    # Delete any backup files on the remote server that are more than 2 days old
+    echo "find \"${remote_dir}\" -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
+
+    # Start all Docker and LXC containers again
+    echo "docker start \$(docker ps -a -q)" >> "$backup_script"
+    echo "for container in \$(lxc-ls); do lxc-start -n \"\$container\"; done" >> "$backup_script"
+
     echo "Backup script generated: $backup_script" | tee -a $logfile
 
     echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup_${remote_name}.sh"
@@ -84,7 +91,6 @@ function backup_server () {
 
     echo "Cron job added to run the backup script every ${remote_freq} hours" | tee -a $logfile
 }
-
 
 function docker_setup () {
     echo ""
@@ -217,7 +223,7 @@ function nginx_ct_setup() {
     #if the ct nameis n8n, allow all ips
     if [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
         echo "Allowing all IPs"
-        sed -i "/deny all;/i allow all;" "/etc/nginx/sites-available/${CT_NAME}"
+        sed -i "s/deny all/allow all/g" "/etc/nginx/sites-available/${CT_NAME}"
     else 
         echo "Allowing only the specified IPs"
         for ip in $ALLOWED_IPS; do
