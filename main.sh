@@ -895,13 +895,14 @@ function reset_server () {
 
     echo "Deleting nginx config files..."
     rm /etc/nginx/sites-available/cadvisor /etc/nginx/sites-enabled/cadvisor > /dev/null
-    rm /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins > /dev/null
-    rm /etc/nginx/sites-available/prometheus /etc/nginx/sites-enabled/prometheus > /dev/null
-    rm /etc/nginx/sites-available/grafana /etc/nginx/sites-enabled/grafana > /dev/null
+    rm /etc/nginx/sites-available/monitoring /etc/nginx/sites-enabled/monitoring > /dev/null
     rm /etc/nginx/sites-available/tolgee /etc/nginx/sites-enabled/tolgee > /dev/null
     rm /etc/nginx/sites-available/appsmith /etc/nginx/sites-enabled/appsmith > /dev/null
     rm /etc/nginx/sites-available/n8n /etc/nginx/sites-enabled/n8n > /dev/null
     rm /etc/nginx/sites-available/owncloud /etc/nginx/sites-enabled/owncloud > /dev/null
+    rm /etc/nginx/sites-available/nextcloud /etc/nginx/sites-enabled/nextcloud > /dev/null
+    rm /etc/nginx/sites-available/react /etc/nginx/sites-enabled/react > /dev/null
+    rm /etc/nginx/sites-available/cube /etc/nginx/sites-enabled/cube > /dev/null
 
     echo "Deleting environment files..."
     rm /root/domain.txt
