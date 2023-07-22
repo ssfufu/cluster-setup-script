@@ -361,7 +361,7 @@ function vps_setup_single () {
     echo ""
     echo "--------------------SETTING UP SSH--------------------"
     systemctl restart nginx.service
-    local IP_user=$IP_server
+    local IP_user=$allowed_ips
     rm /etc/ssh/sshd_config
     cp /root/cluster-setup-script/ssh/sshd_config_template /etc/ssh/sshd_config
     touch /etc/hosts.allow
