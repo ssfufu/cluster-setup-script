@@ -379,6 +379,14 @@ function vps_setup_single () {
     echo "--------------------BACKUP SETUP--------------------"
     backup_server
 
+    echo ""
+    echo "--------------------AUTOMATIC UPDATES--------------------"
+    cp /root/cluster-setup-script/updates/updates.sh /root/updates.sh
+    chmod +x /root/updates.sh
+    touch /etc/cron.d/auto_updates
+    echo "0 2 * * * root /root/updates.sh" > /etc/cron.d/auto_updates
+
+
 
     echo ""
     echo ""
