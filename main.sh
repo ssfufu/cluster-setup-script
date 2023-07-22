@@ -328,7 +328,7 @@ function vps_setup_single () {
     echo $mail_user > /root/mail.txt
     local IP_server=$(curl -s ifconfig.me)
 
-    read -p "What IP(S) do you want to allow for cAdvisor? (Separated by a space) " allowed_ips
+    read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
     touch /root/allowed_ips.txt
     echo $allowed_ips > /root/allowed_ips.txt
     apt install sshpass -y
