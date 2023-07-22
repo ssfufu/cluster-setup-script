@@ -68,7 +68,7 @@ function backup_server () {
     echo "for container in \$(lxc-ls); do lxc-stop -n \"\$container\"; done" >> "$backup_script"
 
     echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/var/lib/docker\" \"/home/devops\")" >> "$backup_script"
-    echo "current_date=\$(date +%Y%m%d)" >> "$backup_script"
+    echo "current_date=\$(date +%Y%m%d_%H%M)" >> "$backup_script"
     echo "tarball_name=\"${remote_name}_\${current_date}.tar.gz\"" >> "$backup_script"
     echo "tar -czf \"\${tarball_name}\" \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
     echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
