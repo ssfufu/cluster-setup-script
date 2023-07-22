@@ -95,7 +95,6 @@ function backup_server () {
     echo "Cron job added to run the backup script every ${remote_freq} hours" | tee -a $logfile
 }
 
-
 function docker_setup () {
     echo ""
     echo ""
@@ -264,8 +263,8 @@ function nginx_setup() {
     sleep 1
     ln -s /snap/bin/certbot /usr/bin/certbot
     ip_self=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-    read -p "What is the IP you want to allow " IP_nginx
-
+    local IP_nginx=$(cat /root/allowed_ips.txt)
+    
     rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
     sed -i "/allow 127.0.0.1;/a \\\n\
@@ -330,6 +329,8 @@ function vps_setup_single () {
     local IP_server=$(curl -s ifconfig.me)
 
     read -p "What IP(S) do you want to allow for cAdvisor? (Separated by a space) " allowed_ips
+    touch /root/allowed_ips.txt
+    echo $allowed_ips > /root/allowed_ips.txt
     apt install sshpass -y
 
     nginx_setup
@@ -360,7 +361,7 @@ function vps_setup_single () {
     echo ""
     echo "--------------------SETTING UP SSH--------------------"
     systemctl restart nginx.service
-    read -p "What is your IP? " IP_user
+    local IP_user=$IP_server
     rm /etc/ssh/sshd_config
     cp /root/cluster-setup-script/ssh/sshd_config_template /etc/ssh/sshd_config
     touch /etc/hosts.allow
@@ -458,8 +459,7 @@ function create_container () {
         exit 1
     else
         if echo "monitoring tolgee owncloud nextcloud react cube" | grep -w "$container_name" >/dev/null; then
-            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
-
+            local allowed_ips=$(cat /root/allowed_ips.txt)
             # asks the user for the network interface the container will use, list the interfaces to choose from
             echo -e "\nThe following interfaces are available:"
             ip a | grep -E "^[0-9]" | awk '{print $2}' | sed 's/://g' | grep -E "^DMZ" | sed 's/^/ - /g'
@@ -810,8 +810,8 @@ function create_container () {
             docker compose up -d
             sleep 2
             echo ""
-            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
-            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
+            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave at setup will be able to access the site until you create a user at the site\e[0m"
+            local allowed_ips=$(cat /root/allowed_ips.txt)
             echo ""
             nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
             user_ct_setup $container_name
@@ -831,8 +831,7 @@ function create_container () {
             docker compose up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
-            read -p "What IP(S) do you want to allow? (Separated by a space, and you can get your own IP at https://ifconfig.me: " allowed_ips
-            echo ""
+            local allowed_ips=$(cat /root/allowed_ips.txt)
             nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
             user_ct_setup $container_name
 
