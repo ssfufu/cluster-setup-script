@@ -89,8 +89,8 @@ function backup_server () {
     echo "Backup script generated: $backup_script" | tee -a $logfile
 
     echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup"
-    chmod 600 "/etc/cron.d/backup_${remote_name}.sh"
-    echo "" >> /etc/cron.d/backup_${remote_name}.sh
+    chmod 600 "/etc/cron.d/backup"
+    echo "" >> /etc/cron.d/backup
 
     echo "Cron job added to run the backup script every ${remote_freq} hours" | tee -a $logfile
 }

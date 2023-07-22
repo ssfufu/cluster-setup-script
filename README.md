@@ -1,4 +1,4 @@
-# 🛠️ System Setup & Container Management Script
+# 🛠️ System Setup & Container Management Script for production systems
 
 > A shell script for setting up a Linux system and managing LXC containers.
 > It has been tested and made for Debian 11 (Bullseye).
