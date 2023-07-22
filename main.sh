@@ -560,7 +560,7 @@ function create_container () {
 
             sleep 5
 
-            lxc-attach $container_name -- ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+            lxc-attach $container_name -- bash -c "ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf"
             sleep 5
             lxc-attach $container_name -- systemctl restart systemd-networkd
             sleep 5
