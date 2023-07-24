@@ -94,7 +94,7 @@ function backup_server () {
         return
     fi
 
-    remote_name=$(read_non_empty "Enter the remote server's backup's name (what you want): ")
+    remote_name=$(read_non_empty "Enter the backup's name (what you want): ")
     remote_freq=$(read_non_empty "Enter the remote server's backup frequency (in hours): ")
     remote_retention=$(read_non_empty "Enter the remote server's backup retention (in days, how many days the data will be stored): ")
     remote_compression=$(read_yn "Enter the remote server's backup compression (y/n): ")
@@ -107,7 +107,7 @@ function backup_server () {
     fi
 
     if [ "$ftp_transfer" = "y" ]; then
-        ftp_ip=$(read_ip)
+        ftp_address=$(read_non_empty "Enter the FTP server's domain: ")
         ftp_username=$(read_non_empty "Enter the FTP server's username: ")
         ftp_password=$(read_non_empty "Enter the FTP server's password: ")
         ftp_dir=$(read_non_empty "Enter the FTP server's backup directory: ")
@@ -149,11 +149,23 @@ function backup_server () {
     echo "tar -czf \"\${tarball_name}\" \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
 
     if [ "$both_transfer" = true ]; then
-        echo "curl -T \"\${tarball_name}\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
+        echo "ftp -n ${ftp_address} <<END_SCRIPT" >> "$backup_script"
+        echo "quote USER ${ftp_username}" >> "$backup_script"
+        echo "quote PASS ${ftp_password}" >> "$backup_script"
+        echo "cd ${ftp_dir}" >> "$backup_script"
+        echo "put ${tarball_name}" >> "$backup_script"
+        echo "quit" >> "$backup_script"
+        echo "END_SCRIPT" >> "$backup_script"
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
     fi
     if [ "$ftp_transfer" = "y" ]; then
-        echo "curl -T \"\${tarball_name}\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
+        echo "ftp -n ${ftp_address} <<END_SCRIPT" >> "$backup_script"
+        echo "quote USER ${ftp_username}" >> "$backup_script"
+        echo "quote PASS ${ftp_password}" >> "$backup_script"
+        echo "cd ${ftp_dir}" >> "$backup_script"
+        echo "put ${tarball_name}" >> "$backup_script"
+        echo "quit" >> "$backup_script"
+        echo "END_SCRIPT" >> "$backup_script"
     fi
     if [ "$rsync_transfer" = "y" ]; then
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
