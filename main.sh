@@ -74,7 +74,7 @@ function backup_server () {
     echo ""
     echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
     echo ""
-    backup_server_ask=$(read_yn "\e[31mDo you want to implement a backup function to the server? (y/n): \e[0m")
+    echo "\e[31mYou need at least another server, ideally with FTP.\e[0m"
     echo ""
     echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
     echo ""
@@ -84,19 +84,27 @@ function backup_server () {
         return
     fi
 
-    remote_ip=$(read_ip)
-    remote_username=$(read_non_empty "Enter the remote server's username: ")
-    remote_password=$(read_non_empty "Enter the remote server's password: " true)
-    remote_port=$(read_non_empty "Enter the remote server's ssh port: ")
-    remote_dir=$(read_non_empty "Enter the remote server's backup directory (where your data will be stored): ")
-    remote_name=$(read_non_empty "Enter the remote server's backup name (what you want): ")
+    ftp_transfer=$(read_yn "Do you have a FTP server? (y/n): ")
+    rsync_transfer=$(read_yn "Do you have a server via rsync, or do you want to transfer the data to it? (y/n): ")
+
+    if [ "$ftp_transfer" = "n" && "$rsync_transfer" = "n" ]; then
+        echo "You need at least one transfer method." | tee -a $logfile
+        backup_server_ask="y"
+        backup_server
+        return
+    fi
+
+    remote_name=$(read_non_empty "Enter the remote server's backup's name (what you want): ")
     remote_freq=$(read_non_empty "Enter the remote server's backup frequency (in hours): ")
     remote_retention=$(read_non_empty "Enter the remote server's backup retention (in days, how many days the data will be stored): ")
     remote_compression=$(read_yn "Enter the remote server's backup compression (y/n): ")
-    ftp_transfer=$(read_yn "Do you also want to transfer the backups to an FTP server? (y/n): ")
 
     logfile="/var/log/backup_${remote_name}.log"
     error_logfile="/var/log/backup_${remote_name}_error.log"
+
+    if [ "$ftp_transfer" = "y" && "$rsync_transfer" = "y" ]; then
+        both_transfer=true
+    fi
 
     if [ "$ftp_transfer" = "y" ]; then
         ftp_ip=$(read_ip)
@@ -105,17 +113,25 @@ function backup_server () {
         ftp_dir=$(read_non_empty "Enter the FTP server's backup directory: ")
     fi
 
+    if [ "$rsync_transfer" = "y" ]; then
+        remote_ip=$(read_ip)
+        remote_username=$(read_non_empty "Enter the remote server's username: ")
+        remote_password=$(read_non_empty "Enter the remote server's password: " true)
+        echo ""
+        remote_port=$(read_non_empty "Enter the remote server's ssh port: ")
+        remote_dir=$(read_non_empty "Enter the remote server's backup directory (where your data will be stored): ")
+        ssh-keygen -t rsa -b 4096 -f "${home_dir}/.ssh/${remote_name}_rsa" -N "" |& tee -a $logfile
+        echo "SSH key pair generated: ${home_dir}/.ssh/${remote_name}_rsa" | tee -a $logfile
+
+        echo "Trying to copy the public key to the remote server..." | tee -a $logfile
+        sshpass -p "$remote_password" ssh-copy-id -p "${remote_port}" -i "${home_dir}/.ssh/${remote_name}_rsa.pub" "${remote_username}@${remote_ip}" |& tee -a $logfile
+    fi
+
     if [ $USER = "root" ]; then
         home_dir="/root"
     else
         home_dir="/home/${USER}"
     fi
-
-    ssh-keygen -t rsa -b 4096 -f "${home_dir}/.ssh/${remote_name}_rsa" -N "" |& tee -a $logfile
-    echo "SSH key pair generated: ${home_dir}/.ssh/${remote_name}_rsa" | tee -a $logfile
-
-    echo "Trying to copy the public key to the remote server..." | tee -a $logfile
-    sshpass -p "$remote_password" ssh-copy-id -p "${remote_port}" -i "${home_dir}/.ssh/${remote_name}_rsa.pub" "${remote_username}@${remote_ip}" |& tee -a $logfile
 
     backup_script="${home_dir}/backup_${remote_name}.sh"
     touch $backup_script && chmod +x $backup_script
@@ -125,25 +141,25 @@ function backup_server () {
     echo "#!/bin/bash" > $backup_script
     echo "current_time=\$(date +\"%d.%m.%Y_%H:%M\")" >> "$backup_script"
     echo "echo \"\${current_time}: Starting backup\" >> $logfile" >> "$backup_script"
-
-    # Stop all running Docker and LXC containers
     echo "docker stop \$(docker ps -q)" >> "$backup_script"
     echo "for container in \$(lxc-ls); do lxc-stop -n \"\$container\"; done" >> "$backup_script"
-
     echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/home/devops\")" >> "$backup_script"
     echo "current_date=\$(date +%Y%m%d_%H%M)" >> "$backup_script"
     echo "tarball_name=\"${remote_name}_\${current_date}.tar.gz\"" >> "$backup_script"
     echo "tar -czf \"\${tarball_name}\" \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
-    echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
 
+    if [ "$both_transfer" = true ]; then
+        echo "curl -T \"\${tarball_name}\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
+        echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
+    fi
     if [ "$ftp_transfer" = "y" ]; then
         echo "curl -T \"\${tarball_name}\" -u ${ftp_username}:${ftp_password} ftp://${ftp_ip}/${ftp_dir}/ 2>> $error_logfile" >> "$backup_script"
     fi
-
-    # Delete any backup files on the remote server that are more than 2 days old
+    if [ "$rsync_transfer" = "y" ]; then
+        echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
+    fi
+    
     echo "find \"${remote_dir}\" -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
-
-    # Start all Docker and LXC containers again
     echo "docker start \$(docker ps -a -q)" >> "$backup_script"
     echo "for container in \$(lxc-ls); do lxc-start -n \"\$container\"; done" >> "$backup_script"
 
@@ -408,7 +424,7 @@ function vps_setup_single () {
 
     docker run --restart=unless-stopped --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
     nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $allowed_ips
-    docker run --restart=unless-stopped -d -p 127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter --name=node-exporter
+    docker run --restart=unless-stopped -d --publish=127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter --name=node-exporter
 
     echo ""
     echo ""
@@ -1033,7 +1049,8 @@ function main () {
     while [[ $choice_state == false ]]; do
         echo "    - Setup your system [1]"
         echo "    - Setup a new container [2]"
-        echo "    - Reset the server [3]"
+        echo "    - Setup the backup [3]"
+        echo "    - Reset the server [4]"
 
 	    echo ""
         read -p "What would you like to do: " user_choice
@@ -1047,9 +1064,13 @@ function main () {
             	choice_state=true
             	;;
             3)
-                	reset_server
+                	backup_server
                 	choice_state=true
                 	;;
+            4)
+                reset_server
+                choice_state=true
+                ;;
             *)
             	echo "Wrong input"
             	;;
