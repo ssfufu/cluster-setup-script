@@ -337,7 +337,7 @@ function nginx_setup() {
     sleep 1
     systemctl enable nginx && systemctl start nginx
     snap install --classic certbot > /dev/null
-    sleep 1
+    sleep 5
     ln -s /snap/bin/certbot /usr/bin/certbot
     ip_self=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
     local IP_nginx=$(cat /root/allowed_ips.txt)
