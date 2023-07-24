@@ -158,7 +158,7 @@ function backup_server () {
     if [ "$rsync_transfer" = "y" ]; then
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
     fi
-    
+
     echo "find \"${remote_dir}\" -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
     echo "docker start \$(docker ps -a -q)" >> "$backup_script"
     echo "for container in \$(lxc-ls); do lxc-start -n \"\$container\"; done" >> "$backup_script"
@@ -247,10 +247,6 @@ function lxc_lxd_setup () {
     echo ""
     echo ""
     echo "--------------------LXC/LXD INSTALLATION--------------------"
-    apt-get install lxc snapd -y > /dev/null
-    sleep 2
-    snap install core > /dev/null
-    sleep 2
     snap install lxd > /dev/null
     sleep 2
 
@@ -413,7 +409,10 @@ function vps_setup_single () {
     touch /root/allowed_ips.txt
     echo $allowed_ips > /root/allowed_ips.txt
     apt install sshpass -y
-
+    apt-get install lxc snapd -y > /dev/null
+    sleep 2
+    snap install core > /dev/null
+    sleep 2
     nginx_setup
     lxc_lxd_setup
     docker_setup
