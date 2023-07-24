@@ -13,35 +13,91 @@ if ! dpkg -l | grep -w "ipcalc" >/dev/null; then
     echo "ipcalc package installed successfully"
 fi
 
+function validate_ip() {
+    local ip=$1
+    local regex='^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+    if [[ $ip =~ $regex ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function read_ip() {
+    local ip
+    while true; do
+        read -p "Enter the remote server's IP address: " ip
+        if validate_ip $ip; then
+            echo $ip
+            break
+        else
+            echo "Invalid IP address. Please enter again."
+        fi
+    done
+}
+
+function read_non_empty() {
+    local prompt=$1
+    local answer
+    while true; do
+        read -p "$prompt" answer
+        if [[ -z "$answer" ]]; then
+            echo "Input cannot be empty. Please enter again."
+        else
+            echo $answer
+            break
+        fi
+    done
+}
+
+function read_yn() {
+    local prompt=$1
+    local answer
+    while true; do
+        read -p "$prompt" answer
+        case $answer in
+            [Yy]* ) echo "y"; break;;
+            [Nn]* ) echo "n"; break;;
+            * ) echo "Invalid input. Please answer y(es) or n(o).";;
+        esac
+    done
+}
+
 function backup_server () {
     echo "--------------------BACKUP SERVER--------------------" | tee -a $logfile
-
-    read -p "Do you want to implement a backup function to the server? (y/n): " backup_server
+    echo ""
+    echo ""
+    echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
+    echo ""
+    backup_server=$(read_yn "\e[31mDo you want to implement a backup function to the server? (y/n): \e[0m")
+    echo ""
+    echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
+    echo ""
+    echo ""
     if [ "$backup_server" = "n" ]; then
         echo "Skipping backup server" | tee -a $logfile
         return
     fi
 
-    read -p "Enter the remote server's IP address: " remote_ip
-    read -p "Enter the remote server's username: " remote_username
-    read -s -p "Enter the remote server's password: " remote_password
-    read -p "Enter the remote server's ssh port: " remote_port
-    read -p "Enter the remote server's backup directory: " remote_dir
-    read -p "Enter the remote server's backup name: " remote_name
-    read -p "Enter the remote server's backup extension: " remote_ext
-    read -p "Enter the remote server's backup frequency (in hours): " remote_freq
-    read -p "Enter the remote server's backup retention (in days): " remote_retention
-    read -p "Enter the remote server's backup compression (y/n): " remote_compression
-    read -p "Do you also want to transfer the backups to an FTP server? (y/n): " ftp_transfer
+    remote_ip=$(read_ip)
+    remote_username=$(read_non_empty "Enter the remote server's username: ")
+    remote_password=$(read_non_empty "Enter the remote server's password: ")
+    remote_port=$(read_non_empty "Enter the remote server's ssh port: ")
+    remote_dir=$(read_non_empty "Enter the remote server's backup directory (where your data will be stored): ")
+    remote_name=$(read_non_empty "Enter the remote server's backup name (what you want): ")
+    remote_freq=$(read_non_empty "Enter the remote server's backup frequency (in hours): ")
+    remote_retention=$(read_non_empty "Enter the remote server's backup retention (in days, how many days the data will be stored): ")
+    remote_compression=$(read_yn "Enter the remote server's backup compression (y/n): ")
+    ftp_transfer=$(read_yn "Do you also want to transfer the backups to an FTP server? (y/n): ")
 
     logfile="/var/log/backup_${remote_name}.log"
     error_logfile="/var/log/backup_${remote_name}_error.log"
 
     if [ "$ftp_transfer" = "y" ]; then
-        read -p "Enter the FTP server's IP address: " ftp_ip
-        read -p "Enter the FTP server's username: " ftp_username
-        read -p "Enter the FTP server's password: " ftp_password
-        read -p "Enter the FTP server's backup directory: " ftp_dir
+        ftp_ip=$(read_ip)
+        ftp_username=$(read_non_empty "Enter the FTP server's username: ")
+        ftp_password=$(read_non_empty "Enter the FTP server's password: ")
+        ftp_dir=$(read_non_empty "Enter the FTP server's backup directory: ")
     fi
 
     if [ $USER = "root" ]; then
