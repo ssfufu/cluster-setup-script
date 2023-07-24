@@ -38,11 +38,16 @@ function read_ip() {
 
 function read_non_empty() {
     local prompt=$1
+    local is_password=$2
     local answer
     while true; do
-        read -p "$prompt" answer
+        if [[ "$is_password" = "true" ]]; then
+            read -s -p "$prompt" answer
+        else
+            read -p "$prompt" answer
+        fi
         if [[ -z "$answer" ]]; then
-            echo "Input cannot be empty. Please enter again."
+            echo "Please enter a value."
         else
             echo $answer
             break
@@ -81,7 +86,7 @@ function backup_server () {
 
     remote_ip=$(read_ip)
     remote_username=$(read_non_empty "Enter the remote server's username: ")
-    remote_password=$(read_non_empty "Enter the remote server's password: ")
+    remote_password=$(read_non_empty "Enter the remote server's password: " true)
     remote_port=$(read_non_empty "Enter the remote server's ssh port: ")
     remote_dir=$(read_non_empty "Enter the remote server's backup directory (where your data will be stored): ")
     remote_name=$(read_non_empty "Enter the remote server's backup name (what you want): ")
