@@ -996,6 +996,8 @@ function reset_server () {
     docker rm $(docker ps -a -q)
     rm -rf /home/devops/appsmith
     rm -rf /home/devops/n8n
+    rm /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
+    rm /root/CHANGELOG.md /root/LICENSE /root/README.md /root/wg0* /root/wireguard-install.sh /root/cluster-setup-script /root/allowed_ips.txt /root/updates.sh
 
     # remove the cronjob in the cron -e and script of the backup
     echo "Deleting backup script and cronjob..."
