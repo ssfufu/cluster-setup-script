@@ -59,7 +59,7 @@ function read_yn() {
     local prompt=$1
     local answer
     while true; do
-        read -p "$prompt" answer
+        read -e -p "$prompt" answer
         case $answer in
             [Yy]* ) echo "y"; break;;
             [Nn]* ) echo "n"; break;;
@@ -74,12 +74,12 @@ function backup_server () {
     echo ""
     echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
     echo ""
-    backup_server=$(read_yn "\e[31mDo you want to implement a backup function to the server? (y/n): \e[0m")
+    backup_server_ask=$(read_yn "\e[31mDo you want to implement a backup function to the server? (y/n): \e[0m")
     echo ""
     echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
     echo ""
     echo ""
-    if [ "$backup_server" = "n" ]; then
+    if [ "$backup_server_ask" = "n" ]; then
         echo "Skipping backup server" | tee -a $logfile
         return
     fi
