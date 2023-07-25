@@ -29,15 +29,8 @@ server {
 
 }
 server {
-    if ($host = ) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
-
-
     listen 80;
     # sub.domain.dom
     server_name
-    return 404; # managed by Certbot
-
-
+    return 301 https://$host$request_uri; # managed by Certbot
 }

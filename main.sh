@@ -95,7 +95,7 @@ function backup_server () {
     fi
 
     remote_name=$(read_non_empty "Enter the backup's name (what you want): ")
-    remote_freq=$(read_non_empty "Enter the remote server's backup frequency (in hours): ")
+    remote_freq=$(read_non_empty "Enter the backup time (0-23): ")
     remote_retention=$(read_non_empty "Enter the remote server's backup retention (in days, how many days the data will be stored): ")
     remote_compression=$(read_yn "Enter the remote server's backup compression (y/n): ")
 
@@ -146,7 +146,7 @@ function backup_server () {
     echo "dirs_to_backup=(\"/etc\" \"/var/lib/lxc\" \"/home/devops\")" >> "$backup_script"
     echo "current_date=\$(date +%Y%m%d_%H%M)" >> "$backup_script"
     echo "tarball_name=\"${remote_name}_\${current_date}.tar.gz\"" >> "$backup_script"
-    echo "tar -czf \"\${tarball_name}\" \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
+    echo "tar -czf /root/backups/${tarball_name} \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
 
     if [ "$both_transfer" = true ]; then
         echo "ftp -n ${ftp_address} <<END_SCRIPT" >> "$backup_script"
@@ -171,13 +171,16 @@ function backup_server () {
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
     fi
 
-    echo "find \"${remote_dir}\" -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
+    echo "find /root/backups -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
     echo "docker start \$(docker ps -a -q)" >> "$backup_script"
-    echo "for container in \$(lxc-ls); do lxc-start -n \"\$container\"; done" >> "$backup_script"
+    echo "for container in $(lxc-ls); do" >> "$backup_script"
+    echo "  lxc-start -n "$container"" >> "$backup_script"
+    echo "  sleep 10" >> "$backup_script"
+    echo "done" >> "$backup_script"
 
     echo "Backup script generated: $backup_script" | tee -a $logfile
 
-    echo "0 */${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup"
+    echo "0 ${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup"
     chmod 600 "/etc/cron.d/backup"
     echo "" >> /etc/cron.d/backup
 
