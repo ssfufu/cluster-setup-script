@@ -148,6 +148,9 @@ function backup_server () {
     echo "tarball_name=\"${remote_name}_\${current_date}.tar.gz\"" >> "$backup_script"
     echo "tar -czf /root/backups/${tarball_name} \"\${dirs_to_backup[@]}\" 2>> $error_logfile" >> "$backup_script"
 
+    echo "local_hash=\$(sha256sum /root/backups/${tarball_name} | awk '{ print \$1 }')" >> "$backup_script"
+    echo "echo \"Local hash: \${local_hash}\"" >> "$backup_script"
+
     if [ "$both_transfer" = true ]; then
         echo "ftp -n ${ftp_address} <<END_SCRIPT" >> "$backup_script"
         echo "quote USER ${ftp_username}" >> "$backup_script"
@@ -156,6 +159,18 @@ function backup_server () {
         echo "put ${tarball_name}" >> "$backup_script"
         echo "quit" >> "$backup_script"
         echo "END_SCRIPT" >> "$backup_script"
+
+        echo "curl --ftp-ssl -u ${ftp_username}:${ftp_password} ftp://${ftp_address}/${ftp_dir}/${tarball_name} -o /root/backups/temp_${tarball_name}" >> "$backup_script"
+        echo "remote_hash=\$(sha256sum /root/backups/temp_${tarball_name} | awk '{ print \$1 }')" >> "$backup_script"
+        echo "echo \"Remote hash: \${remote_hash}\"" >> "$backup_script"
+        echo "rm /root/backups/temp_${tarball_name}" >> "$backup_script"
+
+        echo "if [ \"\${local_hash}\" == \"\${remote_hash}\" ]; then" >> "$backup_script"
+        echo "  echo \"Hashes match.\"" >> "$backup_script"
+        echo "else" >> "$backup_script"
+        echo "  echo \"Hashes do not match.\"" >> "$backup_script"
+        echo "fi" >> "$backup_script"
+
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
     fi
     if [ "$ftp_transfer" = "y" ]; then
@@ -166,6 +181,17 @@ function backup_server () {
         echo "put ${tarball_name}" >> "$backup_script"
         echo "quit" >> "$backup_script"
         echo "END_SCRIPT" >> "$backup_script"
+
+        echo "curl --ftp-ssl -u ${ftp_username}:${ftp_password} ftp://${ftp_address}/${ftp_dir}/${tarball_name} -o /root/backups/temp_${tarball_name}" >> "$backup_script"
+        echo "remote_hash=\$(sha256sum /root/backups/temp_${tarball_name} | awk '{ print \$1 }')" >> "$backup_script"
+        echo "echo \"Remote hash: \${remote_hash}\"" >> "$backup_script"
+        echo "rm /root/backups/temp_${tarball_name}" >> "$backup_script"
+
+        echo "if [ \"\${local_hash}\" == \"\${remote_hash}\" ]; then" >> "$backup_script"
+        echo "  echo \"Hashes match.\"" >> "$backup_script"
+        echo "else" >> "$backup_script"
+        echo "  echo \"Hashes do not match.\"" >> "$backup_script"
+        echo "fi" >> "$backup_script"
     fi
     if [ "$rsync_transfer" = "y" ]; then
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
@@ -173,8 +199,8 @@ function backup_server () {
 
     echo "find /root/backups -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
     echo "docker start \$(docker ps -a -q)" >> "$backup_script"
-    echo "for container in $(lxc-ls); do" >> "$backup_script"
-    echo "  lxc-start -n "$container"" >> "$backup_script"
+    echo "for container in \$(lxc-ls); do" >> "$backup_script"
+    echo "  lxc-start -n \"\$container\"" >> "$backup_script"
     echo "  sleep 10" >> "$backup_script"
     echo "done" >> "$backup_script"
 
@@ -184,8 +210,9 @@ function backup_server () {
     chmod 600 "/etc/cron.d/backup"
     echo "" >> /etc/cron.d/backup
 
-    echo "Cron job added to run the backup script every ${remote_freq} hours" | tee -a $logfile
+    echo "Cron job added to run the backup script every day at ${remote_freq}" | tee -a $logfile
 }
+
 
 function docker_setup () {
     echo ""
