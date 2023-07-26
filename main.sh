@@ -748,30 +748,26 @@ function create_container () {
                 update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
                 sleep 10
 
+                read -p "Please enter the host of the database: " db_host
+                read -p "Please enter the port of the database: " db_port
+                read -p "Please enter the name of the database: " db_name
+                read -p "Please enter the username of the database: " db_username
+                read -s -p "Please enter the password of the database: " db_password
+                ecbo ""
+                read -s -p "Please enter a password for the admin user: " admin_password
                 echo ""
-                echo "--- Setting up PostgreSQL ---"
-                read -s -p "Please enter a password for the database (also it will be the initial password for the intial user <tolgee>): " db_password
-                echo ""
-                
-                echo "Creating database..."
-                lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE DATABASE tolgee;'\""
 
-                echo "Creating user..."
-                lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'CREATE USER tolgee WITH ENCRYPTED PASSWORD '\''${db_password}'\'';'\""
-
-                echo "Granting privileges..."
-                lxc-attach $container_name -- bash -c "su postgres -c \"psql -c 'GRANT ALL PRIVILEGES ON DATABASE tolgee TO tolgee;'\""
 
                 lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
                 sleep 5
-                echo -e "spring.datasource.url=jdbc:postgresql://localhost:5432/tolgee\n
-                    spring.datasource.username=tolgee\n
+                echo -e "spring.datasource.url=jdbc:postgresql://${db_host}:${db_port}/tolgee\n
+                    spring.datasource.username=${db_username}\n
                     spring.datasource.password=${db_password}\n
                     server.port=8200\n
                     tolgee.authentication.enabled=true\n
                     tolgee.authentication.create-initial-user=true\n
                     tolgee.authentication.initial-username=tolgee\n
-                    tolgee.authentication.initial-password=${db_password}\n" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
+                    tolgee.authentication.initial-password=${admin_password}\n" > /var/lib/lxc/${container_name}/rootfs/root/application.properties
 
                 cp /root/cluster-setup-script/tolgee/tolgee.service /var/lib/lxc/${container_name}/rootfs/etc/systemd/system/tolgee.service
 
