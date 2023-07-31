@@ -95,7 +95,6 @@ function backup_server () {
     fi
 
     remote_name=$(read_non_empty "Enter the backup's name (what you want): ")
-    remote_freq=$(read_non_empty "Enter the backup time (0-23): ")
     remote_retention=$(read_non_empty "Enter the remote server's backup retention (in days, how many days the data will be stored): ")
     remote_compression=$(read_yn "Enter the remote server's backup compression (y/n): ")
 
@@ -155,12 +154,12 @@ function backup_server () {
         echo "ftp -n ${ftp_address} <<END_SCRIPT" >> "$backup_script"
         echo "quote USER ${ftp_username}" >> "$backup_script"
         echo "quote PASS ${ftp_password}" >> "$backup_script"
-        echo "cd /" >> "$backup_script"
-        echo "put ${tarball_name}" >> "$backup_script"
+        echo "cd backups" >> "$backup_script"
+        echo "put /root/backups/${tarball_name} ${tarball_name}" >> "$backup_script"
         echo "quit" >> "$backup_script"
         echo "END_SCRIPT" >> "$backup_script"
 
-        echo "curl -u ${ftp_username}:${ftp_password} ftp://${ftp_address}/${tarball_name} -o /root/backups/temp_${tarball_name}" >> "$backup_script"
+        echo "curl -u '${ftp_username}:${ftp_password}' ftp://${ftp_address}/backups/${tarball_name} -o /root/backups/temp_${tarball_name}" >> "$backup_script"
         echo "remote_hash=\$(sha256sum /root/backups/temp_${tarball_name} | awk '{ print \$1 }')" >> "$backup_script"
         echo "echo \"Remote hash: \${remote_hash}\"" >> "$backup_script"
         echo "rm /root/backups/temp_${tarball_name}" >> "$backup_script"
@@ -197,22 +196,23 @@ function backup_server () {
         echo "rsync -avz -e \"ssh -i ${home_dir}/.ssh/${remote_name}_rsa -p $remote_port\" \"\${tarball_name}\" \"${remote_username}@${remote_ip}:${remote_dir}/\" 2>> $error_logfile" >> "$backup_script"
     fi
 
-    echo "find /root/backups -name \"${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
+    echo "find /root/backups -name \"backup_${remote_name}_*.tar.gz\" -type f -mtime +${remote_retention} -delete 2>> $error_logfile" >> "$backup_script"
     echo "docker start \$(docker ps -a -q)" >> "$backup_script"
-    echo "for container in \$(lxc-ls); do" >> "$backup_script"
-    echo "  lxc-start -n \"\$container\"" >> "$backup_script"
-    echo "  sleep 10" >> "$backup_script"
+    echo "for container in \$(/usr/bin/lxc-ls); do" >> "$backup_script"
+    echo "  /usr/bin/lxc-start -n \"\${container}\" --logfile /var/log/lxc-\"\${container}.log\" --logpriority DEGUB >> "$backup_script"
+    echo "  sleep 10" >> "$backup_script""
     echo "done" >> "$backup_script"
 
     echo "Backup script generated: $backup_script" | tee -a $logfile
 
-    echo "0 ${remote_freq} * * * root ${backup_script}" > "/etc/cron.d/backup"
+    echo "Adding cron job..." | tee -a $logfile
+    echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" > /etc/cron.d/backup
+    echo "0 2 * * * root ${backup_script}" >> "/etc/cron.d/backup"
     chmod 600 "/etc/cron.d/backup"
     echo "" >> /etc/cron.d/backup
 
-    echo "Cron job added to run the backup script every day at ${remote_freq}" | tee -a $logfile
+    echo "Cron job added to run the backup script every day at 2 AM" | tee -a $logfile
 }
-
 
 function docker_setup () {
     echo ""
@@ -506,7 +506,7 @@ function vps_setup_single () {
     cp /root/cluster-setup-script/updates/updates.sh /root/updates.sh
     chmod +x /root/updates.sh
     touch /etc/cron.d/auto_updates
-    echo "0 2 * * * root /root/updates.sh" > /etc/cron.d/auto_updates
+    echo "0 3 * * * root /root/updates.sh" > /etc/cron.d/auto_updates
     chmod 600 /etc/cron.d/auto_updates
 
     echo ""
@@ -958,6 +958,31 @@ function create_container () {
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
             nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
+            user_ct_setup $container_name
+
+            echo -e "Setup done\n"
+            ;;
+        
+        "illa")
+            echo -e "Setting up illa...\n"
+            read -p "Enter the port: " illa_port
+            apt-get install build-essential
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+            source "$HOME/.cargo/env"
+            cargo install illa
+            illa deploy --self --port=$illa_port
+
+            echo ""
+            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
+            echo -e "\e[31m\e[1mIMPORTANT: Do you want to add new IPs to get acess to illa? (y/n) \e[0m"
+            read -p "" choice
+            if [ "$choice" == "y" ]; then
+                echo -e "\e[31m\e[1mIMPORTANT: Enter the IPs separated by a space\e[0m"
+                read -p "" ips
+                echo $ips >> /root/allowed_ips.txt
+            fi
+            local allowed_ips=$(cat /root/allowed_ips.txt)
+            nginx_ct_setup "localhost" "$illa_port" $container_name $allowed_ips
             user_ct_setup $container_name
 
             echo -e "Setup done\n"
