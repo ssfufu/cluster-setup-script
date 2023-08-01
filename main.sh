@@ -954,6 +954,10 @@ function create_container () {
             read -p "Enter the mail address: " n8n_mail
 
             echo -e "Setting up n8n...\n"
+            sed -i "s/N8N_BASIC_AUTH_USER=/N8N_BASIC_AUTH_USER=$n8n_username/g" /root/cluster-setup-script/n8n/.env
+            sed -i "s/N8N_BASIC_AUTH_PASSWORD=/N8N_BASIC_AUTH_PASSWORD=$n8n_password/g" /root/cluster-setup-script/n8n/.env
+            sed -i "s/DOMAIN_NAME=/DOMAIN_NAME=${dom}/g" /root/cluster-setup-script/n8n/.env
+            sed -i "s/SSL_EMAIL=/SSL_EMAIL=$n8n_mail/g" /root/cluster-setup-script/n8n/.env
 
             docker compose up -d
             echo ""
