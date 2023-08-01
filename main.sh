@@ -465,7 +465,7 @@ function vps_setup_single () {
 
     docker run --restart=unless-stopped --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
     nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $allowed_ips
-    docker run --restart=unless-stopped -d --publish=127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter --name=node-exporter
+    docker run --restart=unless-stopped --name=node-exporter -d --publish=127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""
     echo ""
@@ -546,6 +546,8 @@ function user_ct_setup () {
     local container_name="$1"
     local dom="$(cat /root/domain.txt)"
 
+    echo ""
+    echo "You can create a user at the site by going to https://${container_name}.$dom"
     echo ""
     echo ""
     echo "------------------------------------------------------------"
@@ -955,7 +957,7 @@ function create_container () {
 
             docker compose up -d
             echo ""
-            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you give will be able to access the site until you create a user at the site\e[0m"
+            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
             nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
             user_ct_setup $container_name
