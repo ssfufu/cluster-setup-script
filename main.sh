@@ -948,17 +948,7 @@ function create_container () {
 
         "n8n")
             cd /root/cluster-setup-script/n8n
-            read -p "Enter the username: " n8n_username
-            read -s -p "Enter the password: " n8n_password
-            echo ""
-            read -p "Enter the mail address: " n8n_mail
-
             echo -e "Setting up n8n...\n"
-            sed -i "s/N8N_BASIC_AUTH_USER=/N8N_BASIC_AUTH_USER=$n8n_username/g" /root/cluster-setup-script/n8n/.env
-            sed -i "s/N8N_BASIC_AUTH_PASSWORD=/N8N_BASIC_AUTH_PASSWORD=$n8n_password/g" /root/cluster-setup-script/n8n/.env
-            sed -i "s/DOMAIN_NAME=/DOMAIN_NAME=${dom}/g" /root/cluster-setup-script/n8n/.env
-            sed -i "s/SSL_EMAIL=/SSL_EMAIL=$n8n_mail/g" /root/cluster-setup-script/n8n/.env
-
             docker compose up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
