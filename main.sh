@@ -752,6 +752,9 @@ function create_container () {
 
                 read -p "Do you want to create a local database, or use an existing one? (create / existing) " db_choice
                 if [[ $db_choice == "create" ]]; then
+                    sed -i "s/#listen_addresses = 'localhost'/listen_addresses = 'localhost,127.0.0.1'/g" /var/lib/lxc/${container_name}/rootfs/etc/postgresql/13/main/postgresql.conf
+                    lxc-attach $container_name -- bash -c "systemctl restart postgresql"
+                    sleep 2
                     db_username="tolgee"
                     db_name="tolgee"
                     db_host="127.0.0.1"
@@ -765,10 +768,9 @@ function create_container () {
                     if [[ $see_password == "y" ]]; then
                         echo "Database password: $db_password"
                     fi
-
-                    lxc-attach $container_name -- bash -c "psql -c \"CREATE USER tolgee WITH PASSWORD '${db_password}';\""
+                    lxc-attach $container_name -- bash -c "su - postgres -c \"psql -c 'CREATE USER tolgee WITH PASSWORD '\''${db_password}'\'';'\""
                     sleep 1
-                    lxc-attach $container_name -- bash -c "psql -c \"CREATE DATABASE tolgee OWNER tolgee;\""
+                    lxc-attach $container_name -- bash -c "su - postgres -c \"psql -c 'CREATE DATABASE tolgee OWNER tolgee;'\""
                     sleep 1
                 elif [[ $db_choice == "existing" ]]; then
                     read -p "Please enter the host of the database: " db_host
