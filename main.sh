@@ -917,7 +917,7 @@ function create_container () {
                 # install nodejs latest version
                 lxc-attach $container_name -- bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash"
                 touch /var/lib/lxc/$container_name/rootfs/root/cube_script.sh
-                echo -e "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash\n export NVM_DIR=\"\$HOME/.nvm\"\n[ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"\nnvm install --lts\nnvm use --lts\nnpm install -g cubejs-cli\nnpm install -g pm2" > /var/lib/lxc/$container_name/rootfs/root/cube_script.sh
+                echo -e "export NVM_DIR=\"\$HOME/.nvm\"\n[ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\"\nnvm install --lts\nnvm use --lts\nnpm install -g cubejs-cli\nnpm install -g pm2" > /var/lib/lxc/$container_name/rootfs/root/cube_script.sh
                 lxc-attach $container_name -- bash -c "chmod +x /root/cube_script.sh"
                 lxc-attach $container_name -- bash -c "/root/cube_script.sh"
 
@@ -928,7 +928,7 @@ function create_container () {
                 read -s -p "Enter the database password: " db_password
                 echo ""
 
-                lxc-attach $container_name -- bash -c "cd /root/cube && cubejs create ${app_name}"
+                lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube && cubejs create ${app_name}"
                 sleep 5
                 cp /root/cluster-setup-script/cube/.env /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
                 sed -i "s/CUBEJS_DB_NAME=/CUBEJS_DB_NAME=$db_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
@@ -936,9 +936,9 @@ function create_container () {
                 sed -i "s/CUBEJS_DB_PASS=/CUBEJS_DB_PASS=$db_password/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
                 sed -i "s/CUBEJS_APP=/CUBEJS_APP=$app_name/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
                 echo "NODE_ENV=production" >> /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/.env
-                lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && npm install && npm update && npm run build"
+                lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && npm install && npm update && npm run build"
                 sleep 5
-                lxc-attach $container_name -- bash -c "cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run start"
+                lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run start"
 
                 sleep 10
                 nginx_ct_setup $IP "4000" $container_name $allowed_ips
