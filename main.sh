@@ -750,18 +750,49 @@ function create_container () {
                 update_install_packages $container_name openjdk-11-jdk jq postgresql postgresql-contrib
                 sleep 10
 
-                read -p "Please enter the host of the database: " db_host
-                read -p "Please enter the port of the database: " db_port
-                read -p "Please enter the name of the database: " db_name
-                read -p "Please enter the username of the database: " db_username
-                read -s -p "Please enter the password of the database: " db_password
-                ecbo ""
+                read -p "Do you want to create a local database, or use an existing one? (create / existing) " db_choice
+                if [[ $db_choice == "create" ]]; then
+                    db_username="tolgee"
+                    db_name="tolgee"
+                    db_host="127.0.0.1"
+                    db_port="5432"
+                    read -s -p "Please enter a password for the database: " db_password
+                    echo ""
+                    echo "The database will be created with the following credentials:"
+                    echo "Database name: $db_name"
+                    echo "Database username: $db_username"
+                    read -p "Do you wish to see the password? (y/n) " see_password
+                    if [[ $see_password == "y" ]]; then
+                        echo "Database password: $db_password"
+                    fi
+
+                    lxc-attach $container_name -- bash -c "psql -c \"CREATE USER tolgee WITH PASSWORD '${db_password}';\""
+                    sleep 1
+                    lxc-attach $container_name -- bash -c "psql -c \"CREATE DATABASE tolgee OWNER tolgee;\""
+                    sleep 1
+                elif [[ $db_choice == "existing" ]]; then
+                    read -p "Please enter the host of the database: " db_host
+                    read -p "Please enter the port of the database: " db_port
+                    read -p "Please enter the name of the database: " db_name
+                    read -p "Please enter the username of the database: " db_username
+                    read -s -p "Please enter the password of the database: " db_password
+                    ecbo ""
+                fi
+
+                echo ""
                 read -s -p "Please enter a password for the admin user: " admin_password
+                echo "The initial admin user will be created with the following credentials:"
+                echo "Username: tolgee"
+                read -p "Do you wish to see the password? (y/n) " see_password_admin
+                if [[ $see_password_admin == "y" ]]; then
+                    echo "Password: $admin_password"
+                fi
                 echo ""
 
 
                 lxc-attach $container_name -- bash -c "curl -s https://api.github.com/repos/tolgee/tolgee-platform/releases/latest | jq -r '.assets[] | select(.content_type == \"application/java-archive\") | .browser_download_url' | xargs -I {} curl -L -o /root/latest-release.jar {}"
                 sleep 5
+                touch /var/lib/lxc/${container_name}/rootfs/root/application.properties
                 echo -e "spring.datasource.url=jdbc:postgresql://${db_host}:${db_port}/tolgee\n
                     spring.datasource.username=${db_username}\n
                     spring.datasource.password=${db_password}\n
@@ -1122,8 +1153,8 @@ function main () {
             	choice_state=true
             	;;
             3)
-                	backup_server
-                	choice_state=true
+                backup_server
+            	choice_state=true
                 	;;
             4)
                 reset_server
