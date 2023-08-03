@@ -1,0 +1,8 @@
+#!/bin/bash
+LXC=/var/lib/lxc
+ROOTFS=rootfs
+RUNNING_CONTAINERS="$(lxc-ls)"
+
+for container in $RUNNING_CONTAINERS; do
+  lxc-stop --name $container
+done

@@ -302,6 +302,12 @@ function lxc_lxd_setup () {
     lxc network create DMZ ipv4.address=10.128.151.1/24 ipv4.nat=true ipv4.dhcp=false
     lxc network create DMZ2 ipv4.address=10.128.152.1/24 ipv4.nat=true ipv4.dhcp=false
 
+    echo "lxc.start.auto = 1" >> /etc/lxc/default.conf
+    echo "lxc.start.delay = 5" >> /etc/lxc/default.conf
+    cp /root/cluster-setup-script/lxd/lxc-containers.service /etc/systemd/system/lxc-containers.service
+    systemctl daemon-reload
+    systemctl enable lxc-containers.service
+    
     echo ""
     echo ""
     echo "--------------------LXC INSTALLED--------------------"    
@@ -343,7 +349,7 @@ function nginx_ct_setup() {
     
     # Add the allowed IPs
     #if the ct nameis n8n, allow all ips
-    if [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ]; then
+    if [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ] || [ "$CT_NAME" = "n8n" ]; then
         echo "Allowing all IPs"
         sed -i "s/deny all/allow all/g" "/etc/nginx/sites-available/${CT_NAME}"
     else 
@@ -450,7 +456,7 @@ function vps_setup_single () {
     read -p "What IP(S) do you want to allow? (Separated by a space) " allowed_ips
     touch /root/allowed_ips.txt
     echo $allowed_ips > /root/allowed_ips.txt
-    apt install sshpass -y
+    apt-get install sshpass -y
     apt-get install lxc snapd -y > /dev/null
     sleep 2
     snap install core > /dev/null
@@ -543,11 +549,11 @@ function check_docker_container_exists() {
 
 function user_ct_setup () {
 
-    local container_name="$1"
+    local subdomain="$1"
     local dom="$(cat /root/domain.txt)"
 
     echo ""
-    echo "You can create a user at the site by going to https://${container_name}.$dom"
+    echo "You can create a user at the site by going to https://${subdomain}.$dom"
     echo ""
     echo ""
     echo "------------------------------------------------------------"
@@ -555,11 +561,11 @@ function user_ct_setup () {
     echo "------------------------------------------------------------"
     echo ""
     if [ "$user_created" == "n" ]; then
-        echo "You can create a user at the site by going to https://${container_name}.$dom"
+        echo "You can create a user at the site by going to https://${subdomain}.$dom"
     else
-        sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/${container_name}
-        rm /etc/nginx/sites-enabled/${container_name}
-        ln -s /etc/nginx/sites-available/${container_name} /etc/nginx/sites-enabled/
+        sed -i 's/deny all/allow all/g' /etc/nginx/sites-available/${subdomain}
+        rm /etc/nginx/sites-enabled/${subdomain}
+        ln -s /etc/nginx/sites-available/${subdomain} /etc/nginx/sites-enabled/
         systemctl restart nginx.service
         sleep 2
     fi
@@ -567,7 +573,7 @@ function user_ct_setup () {
 
 function create_container () {
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
-    docker_cts=("n8n" "appsmith")
+    docker_cts=("n8n" "appsmith" "illa")
     lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react" "cube")
     echo "The following containers are available:"
     echo "Docker containers: ${docker_cts[*]}"
@@ -812,7 +818,7 @@ function create_container () {
                 sleep 2
                 lxc-attach $container_name -- bash -c "systemctl start tolgee && systemctl enable tolgee"
                 sleep 5
-                nginx_ct_setup $IP "8200" $container_name $allowed_ips
+                 port_forwarding=8200
                 ;;
 
             "owncloud")
@@ -839,8 +845,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "sed -i 's/memory_limit = .*/memory_limit = 512M/' /etc/php/7.4/fpm/php.ini"
                 lxc-attach $container_name -- bash -c "systemctl restart php7.4-fpm"
                 lxc-attach $container_name -- bash -c "systemctl restart nginx"
-                nginx_ct_setup $IP "80" $container_name $allowed_ips
-
+                port_forwarding=80
                 ;;
             "nextcloud")
                 update_install_packages $container_name apache2 libapache2-mod-php mariadb-client unzip wget php-gd php-json php-mysql php-curl php-mbstring php-intl php-imagick php-xml php-zip
@@ -863,9 +868,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "a2dissite 000-default"
                 echo "ServerName ${container_name}" >> /var/lib/lxc/$container_name/rootfs/etc/apache2/apache2.conf
                 lxc-attach $container_name -- bash -c "systemctl restart apache2"
-
-                nginx_ct_setup $IP "80" $container_name $allowed_ips
-                systemctl restart nginx.service
+                port_forwarding=80
                 ;;
                 
             "react")
@@ -879,7 +882,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "nvm use --lts"
 
                 sleep 10
-                nginx_ct_setup $IP "3000" $container_name $allowed_ips
+                port_forwarding=3000
                 lxc-attach $container_name -- bash -c "npm install -g pm2"
                 lxc-attach $container_name -- bash -c "pm2 startup"
                 echo "Installing react..."
@@ -946,9 +949,20 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run dev"
                 lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && pm2 save"
                 sleep 10
-                nginx_ct_setup $IP "4000" $container_name $allowed_ips
+                port_forwarding=4000
                 ;;
             esac
+            echo ""
+            echo ""
+            echo "--------------------------------SUBDOMAIN SETUP-----------------------------------"
+            echo ""
+            read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
+            if [ "$subdomain_choice" == "n" ]; then
+                read -p "Enter the subdomain: " subdomain
+                nginx_ct_setup $IP $port_forwarding $subdomain $allowed_ips
+            elif [ "$subdomain_choice" == "y" ]; then
+                nginx_ct_setup $IP $port_forwarding $container_name $allowed_ips
+            fi
 
             sleep 3
             lxc-info -n $container_name
@@ -978,9 +992,7 @@ function create_container () {
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave at setup will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
             echo ""
-            nginx_ct_setup "localhost" "8000" "appsmith" $allowed_ips
-            user_ct_setup $container_name
-
+            port_forwarding=8000
             echo -e "Setup done\n"
             ;;
 
@@ -991,21 +1003,18 @@ function create_container () {
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
-            nginx_ct_setup "localhost" "5678" $container_name $allowed_ips
-            user_ct_setup $container_name
-
+            port_forwarding=5678
             echo -e "Setup done\n"
             ;;
         
         "illa")
             echo -e "Setting up illa...\n"
-            read -p "Enter the port: " illa_port
+            read -p "Enter the port: " port_forwarding
             apt-get install build-essential
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
             source "$HOME/.cargo/env"
             cargo install illa
-            illa deploy --self --port=$illa_port
-
+            illa deploy --self --port=$port_forwarding
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             echo -e "\e[31m\e[1mIMPORTANT: Do you want to add new IPs to get acess to illa? (y/n) \e[0m"
@@ -1016,15 +1025,25 @@ function create_container () {
                 echo $ips >> /root/allowed_ips.txt
             fi
             local allowed_ips=$(cat /root/allowed_ips.txt)
-            nginx_ct_setup "localhost" "$illa_port" $container_name $allowed_ips
-            user_ct_setup $container_name
-
             echo -e "Setup done\n"
             ;;
         esac
+         echo ""
+        echo ""
+        echo "--------------------------------SUBDOMAIN SETUP-----------------------------------"
+        echo ""
+        read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
+        if [ "$subdomain_choice" == "n" ]; then
+            read -p "Enter the subdomain: " subdomain
+            nginx_ct_setup "localhost" $port_forwarding $subdomain $allowed_ips
+        elif [ "$subdomain_choice" == "y" ]; then
+            nginx_ct_setup "localhost" $port_forwarding $container_name $allowed_ips
+        fi
+        user_ct_setup $subdomain
     fi
 
     sleep 3
+    fqdn="https://$subdomain.$dom"
 
     echo ""
     echo "--------------------CONTAINER SETUP DONE--------------------"
@@ -1032,11 +1051,11 @@ function create_container () {
     case $container_name in
     "monitoring")
         echo "Your visual monitoring services are available at: "
-        echo https://$srv_name
+        echo $fqdn
         echo "https://cadvisor.$dom"
         ;;
     *)
-        echo "You can go to your site at: https://${srv_name}"
+        echo "You can go to your site at: ${fqdn}"
         ;;
     esac
     echo ""
