@@ -4,7 +4,7 @@ After=lxc.service
 
 [Service]
 ExecStart=/usr/bin/lxc-autostart
-ExecStop=/root/cluster-setup-script/lxc-shutdown
+ExecStop=/root/cluster-setup-script/lxd/lxc-shutdown
 Restart=always
 
 [Install]
