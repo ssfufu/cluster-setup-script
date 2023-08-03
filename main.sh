@@ -305,9 +305,10 @@ function lxc_lxd_setup () {
     echo "lxc.start.auto = 1" >> /etc/lxc/default.conf
     echo "lxc.start.delay = 5" >> /etc/lxc/default.conf
     cp /root/cluster-setup-script/lxd/lxc-containers.service /etc/systemd/system/lxc-containers.service
+    chmod +x /root/cluster-setup-script/lxd/lxc-shutdown
     systemctl daemon-reload
     systemctl enable lxc-containers.service
-    
+
     echo ""
     echo ""
     echo "--------------------LXC INSTALLED--------------------"    
@@ -946,8 +947,7 @@ function create_container () {
                 sed -i "s/YOUR_CUBEJS_SECRET/$secret/g" /var/lib/lxc/$container_name/rootfs/root/cube/${app_name}/jwt.js
                 lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && npm install && npm update"
                 sleep 5
-                lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run dev"
-                lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && pm2 save"
+                lxc-attach $container_name -- bash -c "export NVM_DIR=\"/root/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\" && nvm use --lts && cd /root/cube/${app_name} && pm2 start --name ${app_name} npm -- run dev && pm2 save"
                 sleep 10
                 port_forwarding=4000
                 ;;
@@ -983,7 +983,7 @@ function create_container () {
             cd /root/cluster-setup-script/appsmith
             curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
             # Change the ports
-            sed -i 's/80:80/127.0.0.1:8000:80/g' $PWD/docker-compose.yml
+            sed -i 's/80:80/127.0.0.1:7667:80/g' $PWD/docker-compose.yml
             sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
             sed -i 's/\.\/stacks:\/appsmith-stacks/\/home\/devops\/appsmith:\/appsmith-stacks/g' $PWD/docker-compose.yml
             docker compose up -d
@@ -992,7 +992,7 @@ function create_container () {
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave at setup will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
             echo ""
-            port_forwarding=8000
+            port_forwarding=7667
             echo -e "Setup done\n"
             ;;
 
