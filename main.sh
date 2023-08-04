@@ -1012,11 +1012,9 @@ function create_container () {
         "illa")
             echo -e "Setting up illa...\n"
             read -p "Enter the port: " port_forwarding
-            apt-get install build-essential
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-            source "$HOME/.cargo/env"
-            cargo install illa
-            illa deploy --self --port=$port_forwarding
+            mkdir -p /home/devops/illa/database
+            mkdir -p /home/devops/illa/drive
+            docker run -d --name illa_builder -p127.0.0.1:${port_forwarding}:${port_forwarding} -v /home/devops/illa/database:/opt/illa/database -v /home/devops/illa/drive:/opt/illa/drive --restart=unless-stopped illasoft/illa-builder:latest 
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             echo -e "\e[31m\e[1mIMPORTANT: Do you want to add new IPs to get acess to illa? (y/n) \e[0m"
