@@ -305,8 +305,9 @@ function lxc_lxd_setup () {
     echo "lxc.start.auto = 1" >> /etc/lxc/default.conf
     echo "lxc.start.delay = 5" >> /etc/lxc/default.conf
     cp /root/cluster-setup-script/lxd/lxc-containers.service /etc/systemd/system/lxc-containers.service
-    chmod +x /root/cluster-setup-script/lxd/lxc-shutdown
+    cp /root/cluster-setupo-script/lxd/lxc-containers.timer /etc/systemd/system/lxc-containers.timer
     systemctl daemon-reload
+    systemctl enable lxc-containers.timer
     systemctl enable lxc-containers.service
 
     echo ""
@@ -974,7 +975,7 @@ function create_container () {
         echo "Container exists"
         exit 1
     else 
-        echo "Container does not exist"
+        echo "Container does not exist yet"
         case $container_name in
         "appsmith")
             echo -e "Setting up appsmith...\n"
@@ -1036,10 +1037,11 @@ function create_container () {
         if [ "$subdomain_choice" == "n" ]; then
             read -p "Enter the subdomain: " subdomain
             nginx_ct_setup "localhost" $port_forwarding $subdomain $allowed_ips
+            user_ct_setup $subdomain
         elif [ "$subdomain_choice" == "y" ]; then
             nginx_ct_setup "localhost" $port_forwarding $container_name $allowed_ips
+            user_ct_setup $container_name
         fi
-        user_ct_setup $subdomain
     fi
 
     sleep 3
