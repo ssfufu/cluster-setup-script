@@ -973,7 +973,7 @@ function create_container () {
     if [ $? -eq 0 ]; then
         echo "Container exists"
         exit 1
-    else 
+    elif [[ ! " ${lxc_cts[@]} " =~ " ${container_name} " ]]; then
         echo "Container does not exist yet"
         case $container_name in
         "appsmith")
