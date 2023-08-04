@@ -960,6 +960,8 @@ function create_container () {
             if [ "$subdomain_choice" == "n" ]; then
                 read -p "Enter the subdomain: " subdomain
                 nginx_ct_setup $IP $port_forwarding $subdomain $allowed_ips
+                sed -i "s/server_name/server_name $subdomain;/g" /var/lib/lxc/$container_name/rootfs/etc/apache2/sites-available/nextcloud.conf
+                lxc-attach $container_name -- bash -c "systemctl restart apache2"
             elif [ "$subdomain_choice" == "y" ]; then
                 nginx_ct_setup $IP $port_forwarding $container_name $allowed_ips
             fi
