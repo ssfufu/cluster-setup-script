@@ -305,7 +305,6 @@ function lxc_lxd_setup () {
     echo "lxc.start.auto = 1" >> /etc/lxc/default.conf
     echo "lxc.start.delay = 5" >> /etc/lxc/default.conf
     cp /root/cluster-setup-script/lxd/lxc-containers.service /etc/systemd/system/lxc-containers.service
-    cp /root/cluster-setupo-script/lxd/lxc-containers.timer /etc/systemd/system/lxc-containers.timer
     systemctl daemon-reload
     systemctl enable lxc-containers.timer
     systemctl enable lxc-containers.service
