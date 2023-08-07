@@ -74,11 +74,12 @@ function backup_server () {
     echo ""
     echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
     echo ""
-    echo "\e[31mYou need at least another server, ideally with FTP.\e[0m"
+    echo -e "\e[31mYou need at least another server, ideally with FTP.\e[0m"
     echo ""
     echo -e "\e[31m--------------------------------------------------------------------------------------------\e[0m"
     echo ""
     echo ""
+    backup_server_ask=$(read_yn "Do you want to setup a backup server? (y/n): ")
     if [ "$backup_server_ask" = "n" ]; then
         echo "Skipping backup server" | tee -a $logfile
         return
@@ -89,8 +90,8 @@ function backup_server () {
 
     if [ "$ftp_transfer" = "n" ] && [ "$rsync_transfer" = "n" ]; then
         echo "You need at least one transfer method." | tee -a $logfile
-        backup_server_ask="y"
-        backup_server
+        echo "Skipping backup server" | tee -a $logfile
+        echo "You can run this script again to setup a backup server with the third option."
         return
     fi
 
@@ -514,16 +515,21 @@ function vps_setup_single () {
     cp /root/cluster-setup-script/ssh/sshd_config_template /etc/ssh/sshd_config
     touch /etc/hosts.allow
     local wgip=$(cat /root/wgip | awk -F'.' '{print $1"."$2"."$3"."}' )
-    local wgip_server=$(ip a show wg0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
-    echo "sshd: ${wgip}" > /etc/hosts.allow
+    if [ "$vpn_choice" == "y" ]; then
+        local wgip_server=$(ip a show wg0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
+        echo "sshd: ${wgip}" > /etc/hosts.allow
+    fi
     echo "sshd: ${IP_user}" >> /etc/hosts.allow
     touch /etc/hosts.deny
     echo "sshd: ALL" > /etc/hosts.deny
     systemctl restart sshd.service
     echo ""
-    echo -e "\e[31mWarning: you will ABSOLUTELY have to be connected to the VPN to ssh to this server OR connect from ${IP_user} \e[0m"
-    echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@${wgip_server} or ssh -p 6845 devops@${IP_server}\e[0m"
-
+    echo -e "\e[31mWarning: you will ABSOLUTELY have to be connected to the VPN (if existing) to ssh to this server OR connect from ${IP_user} \e[0m"
+    if [ "$vpn_choice" == "y" ]; then
+        echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@${wgip_server} or ssh -p 6845 devops@${IP_server}\e[0m"
+    else
+        echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@${IP_server}\e[0m"
+    fi
 
     echo ""
     echo "--------------------BACKUP SETUP--------------------"
