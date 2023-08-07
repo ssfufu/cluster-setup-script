@@ -393,25 +393,27 @@ function nginx_setup() {
     ip_self=$(ip addr show wlo1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
     read -ra IPs <<< "$(cat /root/allowed_ips.txt)"
 
-    #local IP_nginx=$(cat /root/allowed_ips.txt)
-
     rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
-    sed -i "|allow 127.0.0.1;|a \\\n\
+    sed -i "\|allow 127.0.0.1;|a \\\n\
                     allow $ip_self;" /etc/nginx/nginx.conf
-    sed -i "|allow $ip_self;|a \\\n\
-                    allow $IP_nginx;" /etc/nginx/nginx.conf
-    sed -i "|allow $IP_nginx;|a \\\n\
+
+    # Commenting out this line since it's not clear where $IP_nginx comes from
+    # sed -i "\|allow $ip_self;|a \\\n\
+    #                allow $IP_nginx;" /etc/nginx/nginx.conf
+
+    sed -i "\|allow $ip_self;|a \\\n\
                     allow 10.128.151.0/24;" /etc/nginx/nginx.conf
-    sed -i "|allow 10.128.151.0/24;|a \\\n\
+    sed -i "\|allow 10.128.151.0/24;|a \\\n\
                     allow 10.128.152.0/24;" /etc/nginx/nginx.conf
 
     last_ip="10.128.152.0/24"
     for ip in "${IPs[@]}"; do
-	sed -i "|allow $last_ip;|a \\n\
-		allow $ip;" /etc/nginx/nginx/conf
+        sed -i "\|allow $last_ip;|a \\n\
+                allow $ip;" /etc/nginx/nginx.conf
         last_ip=$ip
     done
+
 
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
