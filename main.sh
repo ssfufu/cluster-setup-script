@@ -306,7 +306,6 @@ function lxc_lxd_setup () {
     echo "lxc.start.delay = 5" >> /etc/lxc/default.conf
     cp /root/cluster-setup-script/lxd/lxc-containers.service /etc/systemd/system/lxc-containers.service
     systemctl daemon-reload
-    systemctl enable lxc-containers.timer
     systemctl enable lxc-containers.service
 
     echo ""
@@ -325,7 +324,10 @@ function nginx_ct_setup() {
 
     # Get the server's IP address and the VPN's IP range and add it to the allowed IPs
     local SERVER_IP=$(curl -s ifconfig.me)
-    ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP 10.66.66.0/24"
+    touch /root/wgip
+    echo $(ip addr show wg0 | grep inet | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) >> /root/wgip
+    local wgip=$(cat /root/wgip)
+    ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP ${wgip}/24"
 
     # construct server_name and proxy_pass
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
@@ -388,21 +390,29 @@ function nginx_setup() {
     snap install --classic certbot > /dev/null
     sleep 5
     ln -s /snap/bin/certbot /usr/bin/certbot
-    ip_self=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-    local IP_nginx=$(cat /root/allowed_ips.txt)
-    
+    ip_self=$(ip addr show wlo1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    read -ra IPs <<< "$(cat /root/allowed_ips.txt)"
+
+    #local IP_nginx=$(cat /root/allowed_ips.txt)
+
     rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
-    sed -i "/allow 127.0.0.1;/a \\\n\
+    sed -i "|allow 127.0.0.1;|a \\\n\
                     allow $ip_self;" /etc/nginx/nginx.conf
-    sed -i "/allow $ip_self;/a \\\n\
+    sed -i "|allow $ip_self;|a \\\n\
                     allow $IP_nginx;" /etc/nginx/nginx.conf
-    sed -i "/allow $IP_nginx;/a \\\n\
+    sed -i "|allow $IP_nginx;|a \\\n\
                     allow 10.128.151.0/24;" /etc/nginx/nginx.conf
-    sed -i "/allow 10.128.151.0/24;/a \\\n\
+    sed -i "|allow 10.128.151.0/24;|a \\\n\
                     allow 10.128.152.0/24;" /etc/nginx/nginx.conf
 
-    
+    last_ip="10.128.152.0/24"
+    for ip in "${IPs[@]}"; do
+	sed -i "|allow $last_ip;|a \\n\
+		allow $ip;" /etc/nginx/nginx/conf
+        last_ip=$ip
+    done
+
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
     cp /root/cluster-setup-script/nginx/default_conf /etc/nginx/sites-available/default
@@ -460,9 +470,22 @@ function vps_setup_single () {
     apt-get install sshpass -y
     apt-get install lxc snapd -y > /dev/null
     sleep 2
+    export PATH=$PATH:/snap/bin
+    sleep 1
     snap install core > /dev/null
     sleep 2
     nginx_setup
+    read -p "Do you want to install a VPN ? " vpn_choice
+    if [ "$vpn_choice" == "y" ]; then
+	    echo ""
+	    echo ""
+	    echo "--------------------INSTALLING WIREGUARD SERVER--------------------"
+	    wireguard_setup
+	    echo ""
+	    echo ""
+	    echo "--------------------WIREGUARD SERVER INSTALLED--------------------"
+    fi
+
     lxc_lxd_setup
     docker_setup
 
@@ -471,20 +494,12 @@ function vps_setup_single () {
     echo "--------------------INSTALLING CADVISOR--------------------"
 
     docker run --restart=unless-stopped --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $allowed_ips
+    nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $(cat /root/allowed_ips)
     docker run --restart=unless-stopped --name=node-exporter -d --publish=127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""
     echo ""
     echo "--------------------CADVISOR INSTALLED--------------------"
-
-    echo ""
-    echo ""
-    echo "--------------------INSTALLING WIREGUARD SERVER--------------------"
-    wireguard_setup
-    echo ""
-    echo ""
-    echo "--------------------WIREGUARD SERVER INSTALLED--------------------"
 
     echo ""
     echo ""
@@ -494,14 +509,16 @@ function vps_setup_single () {
     rm /etc/ssh/sshd_config
     cp /root/cluster-setup-script/ssh/sshd_config_template /etc/ssh/sshd_config
     touch /etc/hosts.allow
-    echo "sshd: 10.66.66." > /etc/hosts.allow
+    local wgip=$(cat /root/wgip | awk -F'.' '{print $1"."$2"."$3"."}' )
+    local wgip_server=$(ip a show wg0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
+    echo "sshd: ${wgip}" > /etc/hosts.allow
     echo "sshd: ${IP_user}" >> /etc/hosts.allow
     touch /etc/hosts.deny
     echo "sshd: ALL" > /etc/hosts.deny
     systemctl restart sshd.service
     echo ""
     echo -e "\e[31mWarning: you will ABSOLUTELY have to be connected to the VPN to ssh to this server OR connect from ${IP_user} \e[0m"
-    echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@10.66.66.1 or ssh -p 6845 devops@${IP_server}\e[0m"
+    echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@${wgip_server} or ssh -p 6845 devops@${IP_server}\e[0m"
 
 
     echo ""
@@ -1198,3 +1215,5 @@ function main () {
 }
 
 main "$@"
+
+ip a show wg0 | grep inet  | awk '{print $2}' | cut -d'/' -f1
