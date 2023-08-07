@@ -409,10 +409,11 @@ function nginx_setup() {
 
     last_ip="10.128.152.0/24"
     for ip in "${IPs[@]}"; do
-        sed -i "/allow $last_ip;/a \\
+        sed -i "\|allow $last_ip;|a \\
                     allow $ip;" /etc/nginx/nginx.conf
         last_ip=$ip
     done
+
 
 
 
