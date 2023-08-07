@@ -87,7 +87,7 @@ function backup_server () {
     ftp_transfer=$(read_yn "Do you have a FTP server? (y/n): ")
     rsync_transfer=$(read_yn "Do you have a server via rsync, or do you want to transfer the data to it? (y/n): ")
 
-    if [ "$ftp_transfer" = "n" && "$rsync_transfer" = "n" ]; then
+    if [ "$ftp_transfer" = "n" ] && [ "$rsync_transfer" = "n" ]; then
         echo "You need at least one transfer method." | tee -a $logfile
         backup_server_ask="y"
         backup_server
