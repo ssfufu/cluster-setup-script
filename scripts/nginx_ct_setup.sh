@@ -20,6 +20,13 @@ function nginx_ct_setup() {
         ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP ${wgip}/24"
     else
         ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP"
+        echo ""
+        echo ""
+        echo "--------------------------------------------------------------------"
+        echo "-------------------------- ${ALLOWED_IPS} --------------------------"
+        echo "--------------------------------------------------------------------"
+        echo ""
+        echo ""
     fi
 
     # construct server_name and proxy_pass
