@@ -1,0 +1,9 @@
+[Unit]
+Description=Start LXD networks on boot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl start snap.lxd.daemon.service
+
+[Install]
+WantedBy=multi-user.target

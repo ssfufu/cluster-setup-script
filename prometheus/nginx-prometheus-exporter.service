@@ -1,0 +1,13 @@
+[Unit]
+Description=NGINX Prometheus Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=www-data
+Group=www-data
+Type=simple
+ExecStart=/usr/local/bin/nginx-prometheus-exporter -nginx.scrape-uri http://127.0.0.1:8080/stub_status
+
+[Install]
+WantedBy=multi-user.target

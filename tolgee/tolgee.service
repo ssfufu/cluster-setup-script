@@ -1,0 +1,15 @@
+[Unit]
+Description=Tolgee Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/
+ExecStart=/usr/bin/java -Dtolgee.postgres-autostart.enabled=false -jar latest-release.jar
+SuccessExitStatus=143
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

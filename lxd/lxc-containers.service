@@ -1,0 +1,10 @@
+[Unit]
+Description=Start all LXC containers
+After=lxc.service snap.lxd.daemon.service
+
+[Service]
+ExecStart=/bin/bash -c 'sleep 30 && /usr/bin/lxc-autostart'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
