@@ -7,7 +7,7 @@ After=network-online.target
 User=www-data
 Group=www-data
 Type=simple
-ExecStart=/usr/local/bin/nginx-prometheus-exporter -nginx.scrape-uri http://localhost:8080/stub_status
+ExecStart=/usr/local/bin/nginx-prometheus-exporter -nginx.scrape-uri http://127.0.0.1:8080/stub_status
 
 [Install]
 WantedBy=multi-user.target
