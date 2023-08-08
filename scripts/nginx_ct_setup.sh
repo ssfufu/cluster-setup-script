@@ -10,10 +10,17 @@ function nginx_ct_setup() {
 
     # Get the server's IP address and the VPN's IP range and add it to the allowed IPs
     local SERVER_IP=$(curl -s ifconfig.me)
-    touch /root/wgip
-    echo $(ip addr show wg0 | grep inet | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) >> /root/wgip
-    local wgip=$(cat /root/wgip)
-    ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP ${wgip}/24"
+    echo "-------------------------- ${SERVER_IP} --------------------------"
+    # check if there is a wireguard interface
+    wg_dir="/etc/wireguard"
+    if [ -d "$wg_dir" ]; then
+        touch /root/wgip
+        echo $(ip addr show wg0 | grep inet | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) >> /root/wgip
+        local wgip=$(cat /root/wgip)
+        ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP ${wgip}/24"
+    else
+        ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP"
+    fi
 
     # construct server_name and proxy_pass
     local SERVER_NAME="${CT_NAME}.${DOMAIN}"
