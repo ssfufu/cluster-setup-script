@@ -1,22 +1,22 @@
 #!/bin/bash
 function nginx_ct_setup() {
     # Get parameters
-    local CT_IP="$1"
-    local CT_PORT="$2"
-    local CT_NAME="$3"
-    local ALLOWED_IPS="$4"
-    local DOMAIN="$(cat /root/domain.txt)"
-    local MAIL="$(cat /root/mail.txt)"
+    CT_IP="$1"
+    CT_PORT="$2"
+    CT_NAME="$3"
+    ALLOWED_IPS="$4"
+    DOMAIN="$(cat /root/domain.txt)"
+    MAIL="$(cat /root/mail.txt)"
 
     # Get the server's IP address and the VPN's IP range and add it to the allowed IPs
-    local SERVER_IP=$(curl -s ifconfig.me)
+    SERVER_IP=$(curl -s ifconfig.me)
     echo "-------------------------- ${SERVER_IP} --------------------------"
     # check if there is a wireguard interface
     wg_dir="/etc/wireguard"
     if [ -d "$wg_dir" ]; then
         touch /root/wgip
         echo $(ip addr show wg0 | grep inet | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) >> /root/wgip
-        local wgip=$(cat /root/wgip)
+        wgip=$(cat /root/wgip)
         ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP ${wgip}/24"
     else
         ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP"
@@ -30,10 +30,10 @@ function nginx_ct_setup() {
     fi
 
     # construct server_name and proxy_pass
-    local SERVER_NAME="${CT_NAME}.${DOMAIN}"
-    local PROXY_PASS="http://${CT_IP}:${CT_PORT}"
-    local PROXY_REDIRECT="http://${CT_IP}:${CT_PORT} https://${SERVER_NAME}"
-    local dir_path="/etc/letsencrypt/live/${SERVER_NAME}"
+    SERVER_NAME="${CT_NAME}.${DOMAIN}"
+    PROXY_PASS="http://${CT_IP}:${CT_PORT}"
+    PROXY_REDIRECT="http://${CT_IP}:${CT_PORT} https://${SERVER_NAME}"
+    dir_path="/etc/letsencrypt/live/${SERVER_NAME}"
 
     # deletes the file if already exists
     rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enabled/$CT_NAME > /dev/null
