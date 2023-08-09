@@ -28,13 +28,17 @@ This shell script is designed to set up and manage a Linux system running variou
 
 The script can set up containers for the following services:
 
-- Jenkins 🔧
 - Prometheus 📊
 - Grafana 📈
 - Tolgee 🌐
-- Appsmith 🛠️
-- n8n 🔄
+- cube.js 📊
+- Node.js 🟩
 - Owncloud ☁️
+- Nextcloud ☁️
+- n8n 🔄
+- Appsmith 📱
+- Illa-buider 🏗️
+
 
 ## 💻 Usage
 
