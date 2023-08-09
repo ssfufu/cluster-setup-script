@@ -1,7 +1,7 @@
 # 🛠️ System Setup & Container Management Script
 
 > A shell script for setting up a Linux system and managing LXC containers.
-> It has been tested and made for Debian 11 (Bullseye).
+> It has been tested and made for Debian 11 and 12 (Bullseye and Bookworm).
 
 
 
