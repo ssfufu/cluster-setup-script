@@ -16,9 +16,9 @@ function nginx_setup() {
 
     # Insert IP addresses after the "allow 127.0.0.1;" line
     sed -i "\|allow 127.0.0.1;|a \\\n\
-                    allow $ip_self;\n\
-                    allow 10.128.151.0/24;\n\
-                    allow 10.128.152.0/24;" /etc/nginx/nginx.conf
+                allow $ip_self;\n\
+                allow 10.128.151.0/24;\n\
+                allow 10.128.152.0/24;" /etc/nginx/nginx.conf
 
     # Now, append the IPs from the array
     for ip in "${IPs[@]}"; do
