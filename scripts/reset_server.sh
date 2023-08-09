@@ -63,6 +63,19 @@ function reset_server () {
     rm /root/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
     rm /root/CHANGELOG.md /root/LICENSE /root/README.md /root/wg0* /root/wireguard-install.sh /root/cluster-setup-script /root/allowed_ips.txt /root/updates.sh
 
+    #removes the lines that contains IPs in /etc/hosts.allow that match the IPs in the allowed_ips.txt
+    echo "Deleting IPs from /etc/hosts.allow..."
+    while read -r line; do
+        sed -i "/$line/d" /etc/hosts.allow
+    done < /root/allowed_ips.txt
+    echo "Removing the deny all line from /etc/hosts.deny..."
+    if grep -q "deny all" /etc/hosts.deny; then
+        sed -i "/deny all/d" /etc/hosts.deny
+    fi
+
+    echo "Deleting docker images..."
+    docker rmi $(docker images -a -q)
+
     # remove the cronjob in the cron -e and script of the backup
     echo "Deleting backup script and cronjob..."
     rm /etc/cron.d/backup*
