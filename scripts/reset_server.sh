@@ -42,6 +42,8 @@ function reset_server () {
     rm /etc/nginx/sites-available/nextcloud /etc/nginx/sites-enabled/nextcloud > /dev/null
     rm /etc/nginx/sites-available/react /etc/nginx/sites-enabled/react > /dev/null
     rm /etc/nginx/sites-available/cube /etc/nginx/sites-enabled/cube > /dev/null
+    rm /etc/nginx/nginx.conf
+    cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
 
     echo "Deleting environment files..."
     rm /root/domain.txt
