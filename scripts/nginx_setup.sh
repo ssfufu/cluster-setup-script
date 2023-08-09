@@ -12,24 +12,19 @@ function nginx_setup() {
     ip_self=$(ip addr show $MAIN_IFACE | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
     read -ra IPs <<< "$(cat /root/allowed_ips.txt)"
 
-    rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
+
+    # Insert IP addresses after the "allow 127.0.0.1;" line
     sed -i "\|allow 127.0.0.1;|a \\\n\
-                allow $ip_self;" /etc/nginx/nginx.conf
-    sed -i "\|allow $ip_self;|a \\\n\
-                allow 10.128.151.0/24;" /etc/nginx/nginx.conf
-    sed -i "\|allow 10.128.151.0/24;|a \\\n\
-                allow 10.128.152.0/24;" /etc/nginx/nginx.conf
+                    allow $ip_self;\n\
+                    allow 10.128.151.0/24;\n\
+                    allow 10.128.152.0/24;" /etc/nginx/nginx.conf
 
-    last_ip="10.128.152.0/24"
+    # Now, append the IPs from the array
     for ip in "${IPs[@]}"; do
-        sed -i "\|allow $last_ip;|a \\
-                    allow $ip;" /etc/nginx/nginx.conf
-        last_ip=$ip
+        sed -i "\|allow 10.128.152.0/24;|a \\\n\
+                allow $ip;" /etc/nginx/nginx.conf
     done
-
-
-
 
     rm /etc/nginx/sites-available/default
     rm /etc/nginx/sites-enabled/default
