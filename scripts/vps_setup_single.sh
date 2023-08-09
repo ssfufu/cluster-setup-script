@@ -49,7 +49,7 @@ function vps_setup_single () {
     echo "--------------------INSTALLING CADVISOR--------------------"
 
     docker run --restart=unless-stopped --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
-    nginx_ct_setup "127.0.0.1" "8899" "cadvisor" $(cat /root/allowed_ips.txt)
+    nginx_ct_setup "127.0.0.1" "8899" "cadvisor" "/root/allowed_ips.txt"
     docker run --restart=unless-stopped --name=node-exporter -d --publish=127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
 
     echo ""

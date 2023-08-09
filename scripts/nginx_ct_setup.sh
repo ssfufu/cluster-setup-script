@@ -4,7 +4,7 @@ function nginx_ct_setup() {
     CT_IP="$1"
     CT_PORT="$2"
     CT_NAME="$3"
-    ALLOWED_IPS="$4"
+    ALLOWED_IPS_PATH="$4"
     DOMAIN="$(cat /root/domain.txt)"
     MAIL="$(cat /root/mail.txt)"
 
@@ -16,16 +16,9 @@ function nginx_ct_setup() {
         touch /root/wgip
         echo $(ip addr show wg0 | grep inet | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) >> /root/wgip
         wgip=$(cat /root/wgip)
-        ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP ${wgip}/24"
+        sed -i "1s/$/ ${SERVER_IP} '${wgip}\/24'/" "${ALLOWED_IPS_PATH}"
     elif [ ! -d "$wg_dir" ]; then
-        ALLOWED_IPS="$ALLOWED_IPS $SERVER_IP"
-        echo ""
-        echo ""
-        echo "--------------------------------------------------------------------"
-        echo "${ALLOWED_IPS}"
-        echo "--------------------------------------------------------------------"
-        echo ""
-        echo ""
+        sed -i "1s/$/ ${SERVER_IP}/" "${ALLOWED_IPS_PATH}"
     fi
 
     # construct server_name and proxy_pass
@@ -50,6 +43,7 @@ function nginx_ct_setup() {
         -e "/location \/ {/a deny all;" /root/cluster-setup-script/nginx/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
     
     # Add the allowed IPs
+    ALLOWED_IPS="$(cat $ALLOWED_IPS_PATH)"
     #if the ct nameis n8n, allow all ips
     if [ "$CT_NAME" = "monitoring" ] || [ "$CT_NAME" = "tolgee" ] || [ "$CT_NAME" = "nextcloud" ] || [ "$CT_NAME" = "owncloud" ] || [ "$CT_NAME" = "react" ] || [ "$CT_NAME" = "n8n" ]; then
         echo "Allowing all IPs"
