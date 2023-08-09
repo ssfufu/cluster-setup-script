@@ -17,7 +17,7 @@
 
 ## 📝 Overview
 
-This shell script is designed to set up and manage a Linux system running various services in LXC (Linux Containers) and Docker. It provides tools for system setup, creating new containers, and installing various packages. The script also configures Nginx, Certbot, WireGuard, and Docker. It is designed to be run on a fresh Debian 11 (Bullseye) system, but it can be modified to work on other Linux distributions. It has been created with the following goals in mind:
+This shell script is designed to set up and manage a Linux system running various services in LXC (Linux Containers) and Docker. It provides tools for system setup, creating new containers, and installing various packages. The script also configures Nginx, Certbot, WireGuard, and Docker. It is designed to be run on a fresh Debian 11 and 12 (Bullseye and Bookworm) system, but it can be modified to work on other Linux distributions. It has been created with the following goals in mind:
 
 - **Simplicity:** The script is designed to be easy to use and understand. It is also designed to be easy to modify and extend.
 - **Security:** The script is designed to be secure and safe to use. It is also designed to be easy to audit and review.
