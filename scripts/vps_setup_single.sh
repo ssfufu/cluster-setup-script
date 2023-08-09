@@ -60,7 +60,7 @@ function vps_setup_single () {
     echo ""
     echo "--------------------SETTING UP SSH--------------------"
     systemctl restart nginx.service
-    local IP_user=$allowed_ips
+    local IP_user=$(cat /root/allowed_ips.txt)
     rm /etc/ssh/sshd_config
     cp /root/cluster-setup-script/ssh/sshd_config_template /etc/ssh/sshd_config
     touch /etc/hosts.allow
@@ -69,12 +69,14 @@ function vps_setup_single () {
         local wgip_server=$(ip a show wg0 | grep inet | awk '{print $2}' | cut -d'/' -f1)
         echo "sshd: ${wgip}" > /etc/hosts.allow
     fi
-    echo "sshd: ${IP_user}" >> /etc/hosts.allow
+    for ip in $IP_user; do
+        echo "sshd: $ip" >> /etc/hosts.allow
+    done
     touch /etc/hosts.deny
     echo "sshd: ALL" > /etc/hosts.deny
     systemctl restart sshd.service
     echo ""
-    echo -e "\e[31mWarning: you will ABSOLUTELY have to be connected to the VPN (if existing) to ssh to this server OR connect from ${IP_user} \e[0m"
+    echo -e "\e[31mWarning: you will ABSOLUTELY have to be connected to the VPN (if existing) to ssh to this server OR connect from those IPs: ${IP_user} \e[0m"
     if [ "$vpn_choice" == "y" ]; then
         echo -e "\e[33mThe command to ssh to this server is now ssh -p 6845 devops@${wgip_server} or ssh -p 6845 devops@${IP_server}\e[0m"
     else
