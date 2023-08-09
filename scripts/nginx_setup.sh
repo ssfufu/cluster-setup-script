@@ -9,7 +9,7 @@ function nginx_setup() {
     snap install --classic certbot > /dev/null
     sleep 5
     ln -s /snap/bin/certbot /usr/bin/certbot
-    ip_self=$(ip addr show wlo1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    ip_self=$(ip addr show $MAIN_IFACE | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
     read -ra IPs <<< "$(cat /root/allowed_ips.txt)"
 
     rm /etc/nginx/nginx.conf
