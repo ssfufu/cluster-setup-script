@@ -15,11 +15,11 @@ function nginx_setup() {
     rm /etc/nginx/nginx.conf
     cp /root/cluster-setup-script/nginx/nginx.conf /etc/nginx/nginx.conf
     sed -i "\|allow 127.0.0.1;|a \\\n\
-                    allow $ip_self;" /etc/nginx/nginx.conf
+                allow $ip_self;" /etc/nginx/nginx.conf
     sed -i "\|allow $ip_self;|a \\\n\
-                    allow 10.128.151.0/24;" /etc/nginx/nginx.conf
+                allow 10.128.151.0/24;" /etc/nginx/nginx.conf
     sed -i "\|allow 10.128.151.0/24;|a \\\n\
-                    allow 10.128.152.0/24;" /etc/nginx/nginx.conf
+                allow 10.128.152.0/24;" /etc/nginx/nginx.conf
 
     last_ip="10.128.152.0/24"
     for ip in "${IPs[@]}"; do
