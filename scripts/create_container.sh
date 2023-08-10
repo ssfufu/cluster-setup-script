@@ -415,7 +415,7 @@ function create_container () {
         "appsmith")
             echo -e "Setting up appsmith...\n"
             mkdir /home/devops/appsmith
-            docker compose up -f /root/cluster-setup-script/docker_compose_files/appsmith/docker-compose.yml -d
+            docker compose -f /root/cluster-setup-script/docker_compose_files/appsmith/docker-compose.yml up -d
             sleep 2
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave at setup will be able to access the site until you create a user at the site\e[0m"
@@ -427,7 +427,7 @@ function create_container () {
 
         "n8n")
             echo -e "Setting up n8n...\n"
-            docker compose up -f /root/cluster-setup-script/docker_compose_files/n8n/docker-compose.yml -d
+            docker compose-f /root/cluster-setup-script/docker_compose_files/n8n/docker-compose.yml up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
@@ -440,7 +440,7 @@ function create_container () {
             port_forwarding=2022
             mkdir -p /home/devops/illa/database
             mkdir -p /home/devops/illa/drive
-            docker compose up -f /root/cluster-setup-script/docker_compose_files/illa/docker-compose.yml -d
+            docker compose -f /root/cluster-setup-script/docker_compose_files/illa/docker-compose.yml up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             echo -e "\e[31m\e[1mIMPORTANT: Do you want to add new IPs to get acess to illa? (y/n) \e[0m"
