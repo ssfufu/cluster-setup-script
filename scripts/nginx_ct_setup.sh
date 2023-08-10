@@ -32,6 +32,10 @@ function nginx_ct_setup() {
 
     # creates a file for this site
     touch /etc/nginx/sites-available/${CT_NAME} &> /dev/null
+    echo "${SERVER_NAME}"
+    echo "${PROXY_PASS}"
+    echo "${PROXY_REDIRECT}"
+    echo "${CT_NAME}"
 
     # substitute placeholders with variable values in the template and create a new config file
     sed -e "s|server_name|server_name ${SERVER_NAME};|g" \
