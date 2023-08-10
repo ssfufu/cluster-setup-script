@@ -448,16 +448,18 @@ function create_container () {
             if [ "$choice" == "y" ]; then
                 echo -e "\e[31m\e[1mIMPORTANT: Enter the IPs separated by a space\e[0m"
                 read -p "" ips
-                echo $ips >> /root/allowed_ips.txt
+                sed -i "1s/^/$ips /" /root/allowed_ips.txt
             fi
             local allowed_ips=$(cat /root/allowed_ips.txt)
             echo -e "Setup done\n"
             ;;
         esac
-         echo ""
+
+        echo ""
         echo ""
         echo "--------------------------------SUBDOMAIN SETUP-----------------------------------"
         echo ""
+        local allowed_ips=$(cat /root/allowed_ips.txt)
         read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
         if [ "$subdomain_choice" == "n" ]; then
             read -p "Enter the subdomain: " subdomain
