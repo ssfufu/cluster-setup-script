@@ -18,7 +18,7 @@ function create_container () {
         echo "You must enter a container name"
         exit 1
     fi
-    if ! echo "monitoring tolgee appsmith n8n owncloud nextcloud react cube" | grep -w "$container_name" >/dev/null; then
+    if ! echo "monitoring tolgee appsmith n8n illa owncloud nextcloud react cube" | grep -w "$container_name" >/dev/null; then
         echo "Container name not in the list"
         exit 1
     fi
