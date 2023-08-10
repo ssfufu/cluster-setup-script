@@ -16,9 +16,9 @@ function nginx_ct_setup() {
         touch /root/wgip
         echo $(ip addr show wg0 | grep inet | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) >> /root/wgip
         wgip=$(cat /root/wgip)
-        sed -i "1s/$/ ${SERVER_IP} '${wgip}\/24'/" "${ALLOWED_IPS_PATH}"
+        sed -i "1s|$| ${SERVER_IP} '${wgip}/24'|" "${ALLOWED_IPS_PATH}"
     elif [ ! -d "$wg_dir" ]; then
-        sed -i "1s/$/ ${SERVER_IP}/" "${ALLOWED_IPS_PATH}"
+        sed -i "1s|$| ${SERVER_IP}|" "${ALLOWED_IPS_PATH}"
     fi
 
     # construct server_name and proxy_pass
