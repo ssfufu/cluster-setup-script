@@ -3,6 +3,8 @@ version: '3'
 services:
   auto_update:
     image: containrrr/watchtower
+    ports:
+      - 127.0.0.1:8837:8080
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --schedule "0 0 * * *" --label-enable --cleanup
