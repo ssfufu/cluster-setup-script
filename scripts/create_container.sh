@@ -431,8 +431,6 @@ function create_container () {
             ;;
 
         "n8n")
-            chmod -R 777 /home/devops/n8n/.n8n/
-            # I know, that line up there is bad
             cd /root/cluster-setup-script/n8n
             echo -e "Setting up n8n...\n"
             docker compose up -d
