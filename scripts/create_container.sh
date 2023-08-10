@@ -384,18 +384,20 @@ function create_container () {
                 port_forwarding=4000
                 ;;
             esac
-            echo ""
-            echo ""
-            echo "--------------------------------SUBDOMAIN SETUP-----------------------------------"
-            echo ""
-            read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
-            if [ "$subdomain_choice" == "n" ]; then
-                read -p "Enter the subdomain: " subdomain
-                nginx_ct_setup $IP $port_forwarding $subdomain $allowed_ips
-                sed -i "s/server_name/server_name $subdomain;/g" /var/lib/lxc/$container_name/rootfs/etc/apache2/sites-available/nextcloud.conf
-                lxc-attach $container_name -- bash -c "systemctl restart apache2"
-            elif [ "$subdomain_choice" == "y" ]; then
+            if [ "$container_name" == "nextcloud" ]; then
                 nginx_ct_setup $IP $port_forwarding $container_name $allowed_ips
+            else
+                echo ""
+                echo ""
+                echo "--------------------------------SUBDOMAIN SETUP-----------------------------------"
+                echo ""
+                read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
+                if [ "$subdomain_choice" == "n" ]; then
+                    read -p "Enter the subdomain: " subdomain
+                    nginx_ct_setup $IP $port_forwarding $subdomain $allowed_ips
+                elif [ "$subdomain_choice" == "y" ]; then
+                    nginx_ct_setup $IP $port_forwarding $container_name $allowed_ips
+                fi
             fi
 
             sleep 3
