@@ -151,6 +151,7 @@ function create_container () {
                 update_install_packages $container_name prometheus
                 file_name="/var/lib/lxc/$container_name/rootfs/etc/prometheus/prometheus.yml"
                 host_ip=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+                port_forwarding="3000"
 
                 # Add the content to the file
                 echo "" >> $file_name
@@ -180,8 +181,6 @@ function create_container () {
 
                 lxc-attach $container_name -- bash -c "chmod +x /root/grafana.sh"
                 lxc-attach $container_name -- bash -c "/root/grafana.sh"
-
-                nginx_ct_setup $IP "3000" $container_name $allowed_ips
                 ;;
 
 
@@ -385,7 +384,7 @@ function create_container () {
                 ;;
             esac
             if [ "$container_name" == "nextcloud" ]; then
-                nginx_ct_setup $IP $port_forwarding $container_name $allowed_ips
+                nginx_ct_setup $IP $port_forwarding $container_name "/root/allowed_ips.txt"
             else
                 echo ""
                 echo ""
@@ -394,9 +393,9 @@ function create_container () {
                 read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
                 if [ "$subdomain_choice" == "n" ]; then
                     read -p "Enter the subdomain: " subdomain
-                    nginx_ct_setup $IP $port_forwarding $subdomain $allowed_ips
+                    nginx_ct_setup $IP $port_forwarding $subdomain "/root/allowed_ips.txt"
                 elif [ "$subdomain_choice" == "y" ]; then
-                    nginx_ct_setup $IP $port_forwarding $container_name $allowed_ips
+                    nginx_ct_setup $IP $port_forwarding $container_name "/root/allowed_ips.txt"
                 fi
             fi
 
@@ -463,10 +462,10 @@ function create_container () {
         read -p "Do you want the subdomain to be ${container_name} ? (y/n) " subdomain_choice
         if [ "$subdomain_choice" == "n" ]; then
             read -p "Enter the subdomain: " subdomain
-            nginx_ct_setup "localhost" $port_forwarding $subdomain $allowed_ips
+            nginx_ct_setup "localhost" $port_forwarding $subdomain "/root/allowed_ips.txt"
             user_ct_setup $subdomain
         elif [ "$subdomain_choice" == "y" ]; then
-            nginx_ct_setup "localhost" $port_forwarding $container_name $allowed_ips
+            nginx_ct_setup "localhost" $port_forwarding $container_name "/root/allowed_ips.txt"
             user_ct_setup $container_name
         fi
     fi
