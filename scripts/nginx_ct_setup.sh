@@ -32,6 +32,7 @@ function nginx_ct_setup() {
 
     # creates a file for this site
     touch /etc/nginx/sites-available/${CT_NAME} &> /dev/null
+    echo "${SERVER_IP}"
     echo "${SERVER_NAME}"
     echo "${PROXY_PASS}"
     echo "${PROXY_REDIRECT}"
