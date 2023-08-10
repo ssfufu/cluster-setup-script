@@ -56,6 +56,9 @@ function vps_setup_single () {
     nginx_ct_setup "127.0.0.1" "8899" "cadvisor" "/root/allowed_ips.txt"
 
     docker compose -f /root/cluster-setup-script/docker_compose_files/node-exporter/docker-compose.yml up -d
+    touch /etc/cron.d/cadvisor_version_updater
+    echo "0 4 * 0 * root /root/cluster-setup-script/cadvisor_version_updater.sh" > /etc/cron.d/cadvisor_version_updater
+    chmod 600 /etc/cron.d/cadvisor_version_updater
 
     echo ""
     echo ""
