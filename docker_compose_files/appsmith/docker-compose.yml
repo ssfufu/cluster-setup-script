@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  appsmith:
+    image: index.docker.io/appsmith/appsmith-ce:latest
+    container_name: appsmith
+    ports:
+      - "7667:80"
+      - "8443:443"
+    volumes:
+      - /home/devops/appsmith:/appsmith-stacks
+    restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"

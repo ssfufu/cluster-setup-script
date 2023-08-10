@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  cadvisor:
+    image:
+    restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    ports:
+      - "127.0.0.1:8899:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/lib/lxc/:/var/lib/lxc:ro
+    container_name: cadvisor

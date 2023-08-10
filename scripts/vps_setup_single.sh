@@ -48,9 +48,14 @@ function vps_setup_single () {
     echo ""
     echo "--------------------INSTALLING CADVISOR--------------------"
 
-    docker run --restart=unless-stopped --volume=/:/rootfs:ro --volume=/var/run:/var/run:ro --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro --volume=/var/lib/lxc/:/var/lib/lxc:ro --publish=127.0.0.1:8899:8080 --detach=true --name=cadvisor gcr.io/cadvisor/cadvisor:v0.47.2
+    docker compose -f /root/cluster-setup-script/docker_compose_files/docker-compose-watchover.yml up -d
+    cadvisor_latest_version=$(curl -s "https://gcr.io/v2/cadvisor/cadvisor/tags/list" | jq -r '.tags[]' | sort -V | tail -n 1)
+    cadvisor_version_full="gcr.io/cadvisor/cadvisor:${cadvisor_latest_version}"
+    sed -i "s|image:.*|image: ${cadvisor_version_full}|" /root/cluster-setup-script/docker_compose_files/cadvisor/docker-compose.yml
+    docker compose -f /root/cluster-setup-script/docker_compose_files/cadvisor/docker-compose.yml up -d
     nginx_ct_setup "127.0.0.1" "8899" "cadvisor" "/root/allowed_ips.txt"
-    docker run --restart=unless-stopped --name=node-exporter -d --publish=127.0.0.1:9111:9100 --net="host" --pid="host" -v "/:/host:ro,rslave" quay.io/prometheus/node-exporter
+
+    docker compose -f /root/cluster-setup-script/docker_compose_files/node-exporter/docker-compose.yml up -d
 
     echo ""
     echo ""

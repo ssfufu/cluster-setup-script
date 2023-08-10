@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    restart: unless-stopped
+    container_name: node-exporter
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    ports:
+      - "127.0.0.1:9111:9100"
+    network_mode: "host"
+    pid: "host"
+    volumes:
+      - "/:/host:ro,rslave"

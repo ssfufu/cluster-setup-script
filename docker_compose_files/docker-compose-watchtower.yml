@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  auto_update:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --schedule "0 0 * * *" --label-enable --cleanup
+    restart: unless-stopped
+    environment:
+      - WATCHTOWER_LIFECYCLE_HOOKS=true

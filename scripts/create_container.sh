@@ -412,15 +412,8 @@ function create_container () {
         case $container_name in
         "appsmith")
             echo -e "Setting up appsmith...\n"
-            mkdir /root/cluster-setup-script/appsmith
             mkdir /home/devops/appsmith
-            cd /root/cluster-setup-script/appsmith
-            curl -L https://bit.ly/docker-compose-CE -o $PWD/docker-compose.yml
-            # Change the ports
-            sed -i 's/80:80/127.0.0.1:7667:80/g' $PWD/docker-compose.yml
-            sed -i 's/443:443/127.0.0.1:8443:443/g' $PWD/docker-compose.yml
-            sed -i 's/\.\/stacks:\/appsmith-stacks/\/home\/devops\/appsmith:\/appsmith-stacks/g' $PWD/docker-compose.yml
-            docker compose up -d
+            docker compose up -f /root/cluster-setup-script/docker_compose_files/appsmith/docker-compose.yml -d
             sleep 2
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave at setup will be able to access the site until you create a user at the site\e[0m"
@@ -431,9 +424,8 @@ function create_container () {
             ;;
 
         "n8n")
-            cd /root/cluster-setup-script/n8n
             echo -e "Setting up n8n...\n"
-            docker compose up -d
+            docker compose up -f /root/cluster-setup-script/docker_compose_files/n8n/docker-compose.yml -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
@@ -443,10 +435,10 @@ function create_container () {
         
         "illa")
             echo -e "Setting up illa...\n"
-            read -p "Enter the port: " port_forwarding
+            port_forwarding=3661
             mkdir -p /home/devops/illa/database
             mkdir -p /home/devops/illa/drive
-            docker run -d --name illa_builder -p127.0.0.1:${port_forwarding}:${port_forwarding} -v /home/devops/illa/database:/opt/illa/database -v /home/devops/illa/drive:/opt/illa/drive --restart=unless-stopped illasoft/illa-builder:latest 
+            docker compose up -f /root/cluster-setup-script/docker_compose_files/illa/docker-compose.yml -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             echo -e "\e[31m\e[1mIMPORTANT: Do you want to add new IPs to get acess to illa? (y/n) \e[0m"
