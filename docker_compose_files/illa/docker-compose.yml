@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     container_name: illa
     ports:
-      - "127.0.0.1:3661:3661"
+      - "127.0.0.1:2022:2022"
     volumes:
       - /home/devops/illa/database:/opt/illa/database
       - /home/devops/illa/drive:/opt/illa/drive
