@@ -23,6 +23,7 @@ function vps_setup_single () {
     touch /root/allowed_ips.txt
     echo $allowed_ips > /root/allowed_ips.txt
     apt-get install sshpass -y
+    apt-get install jq -y
     apt-get install lxc snapd -y > /dev/null
     sleep 2
     export PATH=$PATH:/snap/bin
