@@ -437,7 +437,7 @@ function create_container () {
         
         "illa")
             echo -e "Setting up illa...\n"
-            port_forwarding=3661
+            port_forwarding=2022
             mkdir -p /home/devops/illa/database
             mkdir -p /home/devops/illa/drive
             docker compose up -f /root/cluster-setup-script/docker_compose_files/illa/docker-compose.yml -d
