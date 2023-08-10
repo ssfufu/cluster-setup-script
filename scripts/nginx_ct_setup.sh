@@ -28,20 +28,20 @@ function nginx_ct_setup() {
     dir_path="/etc/letsencrypt/live/${SERVER_NAME}"
 
     # deletes the file if already exists
-    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enabled/$CT_NAME > /dev/null
+    rm /etc/nginx/sites-available/$CT_NAME /etc/nginx/sites-enabled/$CT_NAME &> /dev/null
 
-    # create a directory for this site if it doesn't exist
-    touch /etc/nginx/sites-available/${CT_NAME} > /dev/null
+    # creates a file for this site
+    touch /etc/nginx/sites-available/${CT_NAME} &> /dev/null
 
     # substitute placeholders with variable values in the template and create a new config file
-    sed -e "s#server_name#server_name ${SERVER_NAME};#g" \
-        -e "s#proxy_set_header Host#proxy_set_header Host ${SERVER_NAME};#g" \
-        -e "s#proxy_pass#proxy_pass ${PROXY_PASS};#g" \
-        -e "s#proxy_redirect#proxy_redirect ${PROXY_REDIRECT};#g" \
-        -e "s#/etc/letsencrypt/live//#/etc/letsencrypt/live/${SERVER_NAME}/#g" \
-        -e "s#if (\$host = )#if (\$host = ${SERVER_NAME})#g" \
+    sed -e "s|server_name|server_name ${SERVER_NAME};|g" \
+        -e "s|proxy_set_header Host|proxy_set_header Host ${SERVER_NAME};|g" \
+        -e "s|proxy_pass|proxy_pass ${PROXY_PASS};|g" \
+        -e "s|proxy_redirect|proxy_redirect ${PROXY_REDIRECT};|g" \
+        -e "s|/etc/letsencrypt/live/|/etc/letsencrypt/live/${SERVER_NAME}/|g" \
+        -e "s|if (\$host = )|if (\$host = ${SERVER_NAME})|g" \
         -e "/location \/ {/a deny all;" /root/cluster-setup-script/nginx/nginx-config > "/etc/nginx/sites-available/${CT_NAME}"
-    
+
     # Add the allowed IPs
     ALLOWED_IPS="$(cat $ALLOWED_IPS_PATH)"
     #if the ct nameis n8n, allow all ips
@@ -57,7 +57,7 @@ function nginx_ct_setup() {
 
 
     # create a symlink to the sites-enabled directory
-    ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/ > /dev/null
+    ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/ &> /dev/null
 
     if [ -d "$dir_path" ]; then
         echo "There already is a certificate for that."
