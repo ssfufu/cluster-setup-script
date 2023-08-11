@@ -299,6 +299,11 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "a2enmod rewrite headers env dir mime"
                 lxc-attach $container_name -- bash -c "a2dissite 000-default"
                 echo "ServerName ${container_name}" >> /var/lib/lxc/$container_name/rootfs/etc/apache2/apache2.conf
+                # replace in /var/lib/lxc/$container_name/rootfs/etc/apache2/php/php.ini the upload_max_filesize and post_max_size to 1G
+                sed -i "s/upload_max_filesize = .*/upload_max_filesize = 1G/g" /var/lib/lxc/$container_name/rootfs/etc/php/8.2/apache2/php.ini
+                sed -i "s/post_max_size = .*/post_max_size = 1G/g" /var/lib/lxc/$container_name/rootfs/etc/php/8.2/apache2/php.ini
+                sed -i "s/max_file_uploads = .*/max_file_uploads = 5/g" /var/lib/lxc/$container_name/rootfs/etc/php/8.2/apache2/php.ini
+                sed -i "s/memory_limit = .*/memory_limit = 2048M/g" /var/lib/lxc/$container_name/rootfs/etc/php/8.2/apache2/php.ini
                 lxc-attach $container_name -- bash -c "systemctl restart apache2"
                 port_forwarding=80
                 ;;
