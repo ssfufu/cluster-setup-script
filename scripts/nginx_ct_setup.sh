@@ -55,8 +55,9 @@ function nginx_ct_setup() {
         done
     fi
 
-
-    # create a symlink to the sites-enabled directory
+    if [ "$CT_NAME" = "chatwoot" ]; then
+        sed -i '/add_header Strict-Transport-Security "max-age=15552000; includeSubDomains; preload";/a set $upstream 127.0.0.1:3000;' /etc/nginx/sites-available/chatwoot
+    fi
     ln -s /etc/nginx/sites-available/${CT_NAME} /etc/nginx/sites-enabled/ &> /dev/null
 
     if [ -d "$dir_path" ]; then

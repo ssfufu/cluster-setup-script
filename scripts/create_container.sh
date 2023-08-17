@@ -460,16 +460,17 @@ function create_container () {
 
         "chatwoot")
             echo -e "Setting up chatwoot...\n"
-            port_forwarding=4738
+            port_forwarding=3000
             read -s -p "Please enter a password for the postgres database: " postpassword
             read -s -p "Please enter a password for the redis database: " redispassword
 
-            sed -i "s/FRONTEND_URL=/FRONTEND_URL=https:\/\/chat.${dom}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
+            #sed -i "s/FRONTEND_URL=/FRONTEND_URL=https:\/\/chat.${dom}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
             sed -i "s/POSTGRES_PASSWORD=/POSTGRES_PASSWORD=${postpassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
             sed -i "s/REDIS_PASSWORD=/REDIS_PASSWORD=${redispassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
-            secretenv=$(openssl rand -hex 64)
+            #secretenv=$(openssl rand -hex 64)
             sed -i "s/SECRET_KEY_BASE=/SECRET_KEY_BASE=${secretenv}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
             
+            docker compose run --rm rails bundle exec rails db:chatwoot_prepare
             docker compose -f /root/cluster-setup-script/docker_compose_files/chatwoot/docker-compose.yml up -d
             echo ""
             echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
