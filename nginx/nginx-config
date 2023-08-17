@@ -2,7 +2,6 @@ server {
     # sub.domain.dom
     server_name
     add_header Strict-Transport-Security "max-age=15552000; includeSubDomains; preload";
-
     location / {
         # http://localhost:port;
         proxy_pass
