@@ -5,7 +5,7 @@ services:
     image: chatwoot/chatwoot:latest
     env_file: .env ## Change this file for customized env variables
     volumes:
-      - /home/devops/chatwoot:/app/public/uploads
+      - /home/devops/storage:/app/storage
 
   rails:
     <<: *base
@@ -13,13 +13,13 @@ services:
       - postgres
       - redis
     ports:
-      - '127.0.0.1:4738:4738'
+      - '127.0.0.1:3000:3000'
     environment:
       - NODE_ENV=production
       - RAILS_ENV=production
       - INSTALLATION_ENV=docker
     entrypoint: docker/entrypoints/rails.sh
-    command: ['bundle', 'exec', 'rails', 's', '-p', '4738', '-b', '0.0.0.0']
+    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
 
   sidekiq:
     <<: *base
@@ -36,7 +36,7 @@ services:
     image: postgres:12
     restart: always
     ports:
-      - '127.0.0.1:9384:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - /home/devops/postgres:/var/lib/postgresql/data
     environment:
