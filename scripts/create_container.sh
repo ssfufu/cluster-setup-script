@@ -6,7 +6,7 @@ source scripts/user_ct_setup.sh
 
 function create_container () {
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
-    docker_cts=("n8n" "appsmith" "illa")
+    docker_cts=("n8n" "appsmith" "illa" "chatwoot")
     lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react" "cube")
     echo "The following containers are available:"
     echo "Docker containers: ${docker_cts[*]}"
@@ -454,6 +454,25 @@ function create_container () {
                 read -p "" ips
                 sed -i "1s/^/$ips /" /root/allowed_ips.txt
             fi
+            local allowed_ips=$(cat /root/allowed_ips.txt)
+            echo -e "Setup done\n"
+            ;;
+
+        "chatwoot")
+            echo -e "Setting up chatwoot...\n"
+            port_forwarding=4738
+            read -s -p "Please enter a password for the postgres database: " postpassword
+            read -s -p "Please enter a password for the redis database: " redispassword
+
+            sed -i "s/FRONTEND_URL=/FRONTEND_URL=https:\/\/chat.${dom}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
+            sed -i "s/POSTGRES_PASSWORD=/POSTGRES_PASSWORD=${postpassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
+            sed -i "s/REDIS_PASSWORD=/REDIS_PASSWORD=${redispassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
+            secretenv=$(openssl rand -hex 64)
+            sed -i "s/SECRET_KEY_BASE=/SECRET_KEY_BASE=${secretenv}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
+            
+            docker compose -f /root/cluster-setup-script/docker_compose_files/chatwoot/docker-compose.yml up -d
+            echo ""
+            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
             local allowed_ips=$(cat /root/allowed_ips.txt)
             echo -e "Setup done\n"
             ;;

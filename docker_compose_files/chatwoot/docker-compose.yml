@@ -1,0 +1,56 @@
+version: '3'
+
+services:
+  base: &base
+    image: chatwoot/chatwoot:latest
+    env_file: .env ## Change this file for customized env variables
+    volumes:
+      - /home/devops/chatwoot:/app/public/uploads
+
+  rails:
+    <<: *base
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - '127.0.0.1:4738:4738'
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    entrypoint: docker/entrypoints/rails.sh
+    command: ['bundle', 'exec', 'rails', 's', '-p', '4738', '-b', '0.0.0.0']
+
+  sidekiq:
+    <<: *base
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+
+  postgres:
+    image: postgres:12
+    restart: always
+    ports:
+      - '127.0.0.1:9384:5432'
+    volumes:
+      - /home/devops/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=chatwoot
+      - POSTGRES_USER=postgres
+      # Please provide your own password.
+      - POSTGRES_PASSWORD=
+
+  redis:
+    image: redis:alpine
+    restart: always
+    command: ["sh", "-c", "redis-server --requirepass \"$REDIS_PASSWORD\""]
+    env_file: .env
+    volumes:
+      - /home/devops/redis:/data
+    ports:
+      - '127.0.0.1:6379:6379'
