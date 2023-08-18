@@ -10,13 +10,17 @@ function nginx_ct_setup() {
 
     # Get the server's IP address and the VPN's IP range and add it to the allowed IPs
     SERVER_IP=$(curl -s ifconfig.me)
-    # check if there is a wireguard interface
     wg_dir="/etc/wireguard"
     if [ -d "$wg_dir" ]; then
-        touch /root/wgip
-        echo $(ip addr show wg0 | grep 'inet ' | grep -v ':' | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) > /root/wgip
+        check if the file /root/wgip exists
+        if [ ! -f "/root/wgip" ]; then
+            touch /root/wgip
+            echo $(ip addr show wg0 | grep 'inet ' | grep -v ':' | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) > /root/wgip
+        fi
         wgip=$(cat /root/wgip)
-        sed -i "1s|\$| ${SERVER_IP} ${wgip}|" "${ALLOWED_IPS_PATH}"
+        if ! grep -q "$wgip" /path/to/your/file; then
+            sed -i "1s|\$| ${SERVER_IP} ${wgip}|" "${ALLOWED_IPS_PATH}"
+        fi
     elif [ ! -d "$wg_dir" ]; then
         sed -i "1s|$| ${SERVER_IP}|" "${ALLOWED_IPS_PATH}"
     fi
