@@ -387,6 +387,14 @@ function create_container () {
                 sleep 10
                 port_forwarding=4000
                 ;;
+            "chatwoot")
+                update_install_packages $container_name curl wget
+                sleep 5
+                echo "Don't let the "
+                lxc-attach $container_name -- bash -c "cd /root && wget https://get.chatwoot.app/linux/install.sh && chmod +x install.sh && ./install.sh --install"
+                sleep 5
+                port_forwarding=3000
+                ;;
             esac
             if [ "$container_name" == "nextcloud" ]; then
                 nginx_ct_setup $IP $port_forwarding $container_name "/root/allowed_ips.txt"
@@ -456,25 +464,7 @@ function create_container () {
             fi
             local allowed_ips=$(cat /root/allowed_ips.txt)
             echo -e "Setup done\n"
-            ;;
-
-        "chatwoot")
-            echo -e "Setting up chatwoot...\n"
-            port_forwarding=3000
-            read -s -p "Please enter a password for the postgres database: " postpassword
-            read -s -p "Please enter a password for the redis database: " redispassword
-
-            sed -i "s/POSTGRES_PASSWORD=/POSTGRES_PASSWORD=${postpassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
-            sed -i "s/REDIS_PASSWORD=/REDIS_PASSWORD=${redispassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/.env
-            sed -i "s/POSTGRES_PASSWORD=/POSTGRES_PASSWORD=${postpassword}/g" /root/cluster-setup-script/docker_compose_files/chatwoot/docker-compose.yml
-            
-            docker compose run --rm rails bundle exec rails db:chatwoot_prepare
-            docker compose -f /root/cluster-setup-script/docker_compose_files/chatwoot/docker-compose.yml up -d
-            echo ""
-            echo -e "\e[31m\e[1mIMPORTANT: Only the IP(s) you gave will be able to access the site until you create a user at the site\e[0m"
-            local allowed_ips=$(cat /root/allowed_ips.txt)
-            echo -e "Setup done\n"
-            ;;
+            ;;  
         esac
 
         echo ""
