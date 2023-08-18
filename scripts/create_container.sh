@@ -319,7 +319,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "nvm use --lts"
 
                 sleep 10
-                port_forwarding=3000
+                port_forwarding=3777
                 lxc-attach $container_name -- bash -c "npm install -g pm2"
                 lxc-attach $container_name -- bash -c "pm2 startup"
                 echo "Installing react..."
@@ -347,7 +347,7 @@ function create_container () {
                     exit 1
                 fi
 
-                lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve ${build_folder} 3000 --name react"
+                lxc-attach $container_name -- bash -c "cd /root/react/${repo_name} && pm2 serve ${build_folder} ${port_forwarding} --name react"
                 lxc-attach $container_name -- bash -c "pm2 save"
                 lxc-attach $container_name -- bash -c "pm2 startup"
                 lxc-attach $container_name -- bash -c "systemctl restart pm2-root"
@@ -394,6 +394,7 @@ function create_container () {
                 lxc-attach $container_name -- bash -c "cd /root && wget https://get.chatwoot.app/linux/install.sh && chmod +x install.sh && ./install.sh --install"
                 sleep 5
                 sed -i "s|^FRONTEND_URL=.*|FRONTEND_URL=https://$container_name.$dom|g" /var/lib/lxc/$container_name/rootfs/home/chatwoot/.env
+                sed -i "s|^ENABLE_ACCOUNT_SIGNUP=.*|ENABLE_ACCOUNT_SIGNUP=true|g" /var/lib/lxc/$container_name/rootfs/home/chatwoot/.env
                 lxc-attach $container_name -- bash -c "systemctl restart chatwoot.target"
                 port_forwarding=3000
                 ;;
@@ -412,6 +413,9 @@ function create_container () {
                 elif [ "$subdomain_choice" == "y" ]; then
                     nginx_ct_setup $IP $port_forwarding $container_name "/root/allowed_ips.txt"
                     subdomain=$container_name
+                fi
+                if [ "$container_name" == "chatwoot" ]; then
+                    user_ct_setup $subdomain
                 fi
             fi
 
