@@ -409,6 +409,7 @@ function create_container () {
                     nginx_ct_setup $IP $port_forwarding $subdomain "/root/allowed_ips.txt"
                 elif [ "$subdomain_choice" == "y" ]; then
                     nginx_ct_setup $IP $port_forwarding $container_name "/root/allowed_ips.txt"
+                    subdomain=$container_name
                 fi
             fi
 
