@@ -6,8 +6,8 @@ source scripts/user_ct_setup.sh
 
 function create_container () {
     packages=("nano" "wget" "software-properties-common" "ca-certificates" "curl" "gnupg" "git")
-    docker_cts=("n8n" "appsmith" "illa" "chatwoot")
-    lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react" "cube")
+    docker_cts=("n8n" "appsmith" "illa")
+    lxc_cts=("monitoring" "tolgee" "owncloud" "nextcloud" "react" "cube" "chatwoot")
     echo "The following containers are available:"
     echo "Docker containers: ${docker_cts[*]}"
     echo "LXC containers: ${lxc_cts[*]}"
@@ -28,7 +28,7 @@ function create_container () {
         echo "Container named $container_name already exists"
         exit 1
     else
-        if echo "monitoring tolgee owncloud nextcloud react cube" | grep -w "$container_name" >/dev/null; then
+        if echo "monitoring tolgee owncloud nextcloud react cube chatwoot" | grep -w "$container_name" >/dev/null; then
             local allowed_ips=$(cat /root/allowed_ips.txt)
             # asks the user for the network interface the container will use, list the interfaces to choose from
             echo -e "\nThe following interfaces are available:"
