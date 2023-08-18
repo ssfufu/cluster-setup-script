@@ -393,8 +393,8 @@ function create_container () {
                 echo "Don't let the "
                 lxc-attach $container_name -- bash -c "cd /root && wget https://get.chatwoot.app/linux/install.sh && chmod +x install.sh && ./install.sh --install"
                 sleep 5
-                sed -i "s|^FRONTEND_URL=.*|FRONTEND_URL=https://$container_name.$dom|g" /var/lib/lxc/$container_name/rootfs/home/chatwoot/.env
-                sed -i "s|^ENABLE_ACCOUNT_SIGNUP=.*|ENABLE_ACCOUNT_SIGNUP=true|g" /var/lib/lxc/$container_name/rootfs/home/chatwoot/.env
+                sed -i "s|^FRONTEND_URL=.*|FRONTEND_URL=https://$container_name.$dom|g" /var/lib/lxc/$container_name/rootfs/home/chatwoot/chatwoot/.env
+                sed -i "s|^ENABLE_ACCOUNT_SIGNUP=.*|ENABLE_ACCOUNT_SIGNUP=true|g" /var/lib/lxc/$container_name/rootfs/home/chatwoot/chatwoot/.env
                 lxc-attach $container_name -- bash -c "systemctl restart chatwoot.target"
                 port_forwarding=3000
                 ;;
