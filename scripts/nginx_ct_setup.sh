@@ -12,7 +12,7 @@ function nginx_ct_setup() {
     SERVER_IP=$(curl -s ifconfig.me)
     wg_dir="/etc/wireguard"
     if [ -d "$wg_dir" ]; then
-        check if the file /root/wgip exists
+        # check if the file /root/wgip exists
         if [ ! -f "/root/wgip" ]; then
             touch /root/wgip
             echo $(ip addr show wg0 | grep 'inet ' | grep -v ':' | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) > /root/wgip
