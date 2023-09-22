@@ -18,7 +18,7 @@ function nginx_ct_setup() {
             echo $(ip addr show wg0 | grep 'inet ' | grep -v ':' | awk '{print $2}' | sed 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\.\)[0-9]\+/\10/' ) > /root/wgip
         fi
         wgip=$(cat /root/wgip)
-        if ! grep -q "$wgip" /path/to/your/file; then
+        if ! grep -q "$wgip" /root/allowed_ips.txt; then
             sed -i "1s|\$| ${SERVER_IP} ${wgip}|" "${ALLOWED_IPS_PATH}"
         fi
     elif [ ! -d "$wg_dir" ]; then
