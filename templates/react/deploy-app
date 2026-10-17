@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Build the application from git and publish it (run as root inside the container).
+# Usage: deploy-app
+set -Eeuo pipefail
+
+SRC=/srv/app/src
+WWW=/srv/app/www
+APP_USER=app
+# shellcheck disable=SC1091
+source /srv/app/deploy.conf   # REPO_URL, BRANCH
+
+as_app() { runuser -u "$APP_USER" -- env HOME=/home/app COREPACK_ENABLE_DOWNLOAD_PROMPT=0 "$@"; }
+
+if [[ -d ${SRC}/.git ]]; then
+    as_app git -C "$SRC" fetch --depth 1 origin "$BRANCH"
+    as_app git -C "$SRC" reset --hard FETCH_HEAD
+else
+    as_app git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$SRC"
+fi
+
+cd "$SRC"
+if [[ -f pnpm-lock.yaml ]]; then
+    as_app corepack pnpm install --frozen-lockfile
+    as_app corepack pnpm run build
+elif [[ -f yarn.lock ]]; then
+    as_app corepack yarn install --immutable || as_app corepack yarn install --frozen-lockfile
+    as_app corepack yarn run build
+elif [[ -f package-lock.json ]]; then
+    as_app npm ci --no-audit --no-fund
+    as_app npm run build
+else
+    as_app npm install --no-audit --no-fund
+    as_app npm run build
+fi
+
+for dir in dist build out; do
+    if [[ -f ${SRC}/${dir}/index.html ]]; then
+        rsync -a --delete "${SRC}/${dir}/" "${WWW}/"
+        chown -R root:www-data "$WWW"
+        find "$WWW" -type d -exec chmod 0755 {} + -o -type f -exec chmod 0644 {} +
+        echo "Published ${dir}/ ($(git -C "$SRC" rev-parse --short HEAD))"
+        exit 0
+    fi
+done
+echo "No build output found (dist/, build/ or out/ with an index.html)." >&2
+exit 1

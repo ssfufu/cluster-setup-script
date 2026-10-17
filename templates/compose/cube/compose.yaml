@@ -1,0 +1,34 @@
+# Managed by cluster-setup — Cube API + Cube Store (cache & pre-aggregations)
+services:
+  cube:
+    image: cubejs/cube:${CUBE_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      - cubestore
+    ports:
+      - "127.0.0.1:${HOST_PORT}:4000"
+    environment:
+      CUBEJS_DB_TYPE: ${CUBEJS_DB_TYPE}
+      CUBEJS_DB_HOST: ${CUBEJS_DB_HOST}
+      CUBEJS_DB_PORT: ${CUBEJS_DB_PORT}
+      CUBEJS_DB_NAME: ${CUBEJS_DB_NAME}
+      CUBEJS_DB_USER: ${CUBEJS_DB_USER}
+      CUBEJS_DB_PASS: ${CUBEJS_DB_PASS}
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET}
+      CUBEJS_CUBESTORE_HOST: cubestore
+      CUBEJS_DEV_MODE: "false"
+      CUBEJS_WEB_SOCKETS: "true"
+      CUBEJS_TELEMETRY: "false"
+    volumes:
+      - ./conf:/cube/conf
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  cubestore:
+    image: cubejs/cubestore:${CUBESTORE_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      CUBESTORE_REMOTE_DIR: /cube/data
+      CUBESTORE_TELEMETRY: "false"
+    volumes:
+      - ./cubestore:/cube/data

@@ -1,0 +1,10 @@
+# Managed by cluster-setup
+services:
+  illa:
+    image: illasoft/illa-builder:${ILLA_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HOST_PORT}:2022"
+    volumes:
+      - ./database:/opt/illa/database
+      - ./drive:/opt/illa/drive

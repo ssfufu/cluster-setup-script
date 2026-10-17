@@ -1,0 +1,19 @@
+# Managed by cluster-setup — ownCloud Infinite Scale behind the host nginx
+services:
+  ocis:
+    image: owncloud/ocis:${OCIS_VERSION:-latest}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "ocis init || true; exec ocis server"]
+    ports:
+      - "127.0.0.1:${HOST_PORT}:9200"
+    environment:
+      OCIS_URL: https://${FQDN}
+      OCIS_INSECURE: "false"
+      PROXY_TLS: "false"
+      PROXY_HTTP_ADDR: 0.0.0.0:9200
+      OCIS_LOG_LEVEL: warn
+      IDM_ADMIN_PASSWORD: ${OCIS_ADMIN_PASSWORD}
+    volumes:
+      - ./config:/etc/ocis
+      - ./data:/var/lib/ocis

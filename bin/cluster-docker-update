@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Pull new images for every cluster-setup Docker stack and recreate the
+# containers that changed. Replaces watchtower (archived, and incompatible
+# with recent Docker releases) without exposing the Docker socket to a
+# third-party container.
+# A stack is skipped if its directory contains a file named .no-auto-update.
+set -Euo pipefail
+
+STACKS_DIR=/opt/cluster-setup/stacks
+status=0
+
+for dir in "${STACKS_DIR}"/*/; do
+    dir=${dir%/}
+    [[ -f ${dir}/compose.yaml ]] || continue
+    name=$(basename "$dir")
+    if [[ -e ${dir}/.no-auto-update ]]; then
+        echo "[skip] ${name}"
+        continue
+    fi
+    echo "[update] ${name}"
+    compose=(docker compose --project-directory "$dir" -f "${dir}/compose.yaml" -p "$name")
+    if ! "${compose[@]}" pull --quiet || ! "${compose[@]}" up -d --remove-orphans; then
+        echo "[error] ${name} could not be updated" >&2
+        status=1
+    fi
+done
+
+docker image prune -f >/dev/null
+exit "$status"

@@ -1,0 +1,26 @@
+# Managed by cluster-setup — container metrics for Docker and LXC.
+# Host network: port 8899 is only reachable locally and from the LXC bridges
+# (enforced by the firewall), and published as https://cadvisor.<domain>
+# for the allow-list only.
+services:
+  cadvisor:
+    image: ghcr.io/google/cadvisor:${CADVISOR_VERSION}
+    container_name: cadvisor
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --port=8899
+      - --housekeeping_interval=30s
+      - --docker_only=false
+      - --store_container_labels=false
+    devices:
+      - /dev/kmsg
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/lib/lxc/:/var/lib/lxc:ro
+      - /dev/disk/:/dev/disk:ro
