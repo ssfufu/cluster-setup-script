@@ -1,0 +1,4 @@
+# Files are sourced together by main.sh: variables defined in one file are
+# used in others, which ShellCheck cannot see file by file.
+disable=SC2034
+external-sources=true

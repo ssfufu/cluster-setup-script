@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Manage WireGuard clients for the cluster-setup VPN.
+# Usage: cluster-wg add <name> [split|full] | remove <name> | list | show <name>
+set -Eeuo pipefail
+umask 077
+
+CONF=/etc/cluster-setup/cluster.conf
+WG_DIR=/etc/wireguard
+WG_CONF=${WG_DIR}/wg0.conf
+CLIENTS=${WG_DIR}/clients
+
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+[[ ${EUID} -eq 0 ]] || die "run as root"
+[[ -f $WG_CONF ]] || die "WireGuard is not configured (${WG_CONF} missing)"
+# shellcheck disable=SC1090
+source "$CONF"
+
+usage() {
+    sed -n '2,3p' "$0" | sed 's/^# //'
+    exit 1
+}
+
+valid_name() { [[ $1 =~ ^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$ ]] || die "invalid client name: $1"; }
+
+next_ip() {
+    local prefix=${WG_SUBNET%.*} i used
+    used=$(awk -F' *= *' '$1=="AllowedIPs"{split($2, a, "/"); print a[1]}' "$WG_CONF")
+    for (( i = 2; i <= 254; i++ )); do
+        grep -qxF "${prefix}.${i}" <<<"$used" || { printf '%s.%s' "$prefix" "$i"; return 0; }
+    done
+    die "no free address left in ${WG_SUBNET}"
+}
+
+sync_wg() {
+    if systemctl is-active --quiet wg-quick@wg0.service; then
+        wg syncconf wg0 <(wg-quick strip wg0)
+    fi
+}
+
+cmd_add() {
+    local name=$1 mode=${2:-split} ip key psk pub allowed dns=''
+    valid_name "$name"
+    [[ -e ${CLIENTS}/${name}.conf ]] && die "client ${name} already exists"
+    case $mode in
+        split) allowed="${WG_SUBNET}, 10.128.151.0/24, 10.128.152.0/24" ;;
+        full)  allowed="0.0.0.0/0, ::/0"; dns="DNS = ${DNS_SERVERS// /, }" ;;
+        *) die "mode must be 'split' (VPN + containers only) or 'full' (all traffic)" ;;
+    esac
+    ip=$(next_ip)
+    key=$(wg genkey)
+    pub=$(wg pubkey <<<"$key")
+    psk=$(wg genpsk)
+
+    mkdir -p "$CLIENTS"
+    printf '\n### client %s\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s/32\n### end %s\n' \
+        "$name" "$pub" "$psk" "$ip" "$name" >> "$WG_CONF"
+
+    {
+        printf '[Interface]\nPrivateKey = %s\nAddress = %s/24\n' "$key" "$ip"
+        [[ -n $dns ]] && printf '%s\n' "$dns"
+        printf '\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nEndpoint = %s:%s\nAllowedIPs = %s\nPersistentKeepalive = 25\n' \
+            "$(<"${WG_DIR}/server.pub")" "$psk" "$WG_ENDPOINT" "$WG_PORT" "$allowed"
+    } > "${CLIENTS}/${name}.conf"
+
+    sync_wg
+    printf 'Client %s added (%s, %s tunnel).\n' "$name" "$ip" "$mode"
+    cmd_show "$name"
+}
+
+cmd_remove() {
+    local name=$1
+    valid_name "$name"
+    grep -qxF "### client ${name}" "$WG_CONF" || die "unknown client ${name}"
+    local tmp
+    tmp=$(mktemp "${WG_CONF}.XXXXXX")
+    awk -v start="### client ${name}" -v end="### end ${name}" '
+        $0 == start {skip = 1}
+        !skip {print}
+        $0 == end {skip = 0}' "$WG_CONF" > "$tmp"
+    mv -f "$tmp" "$WG_CONF"
+    rm -f "${CLIENTS}/${name}.conf"
+    sync_wg
+    printf 'Client %s removed.\n' "$name"
+}
+
+cmd_list() {
+    awk '/^### client /{print $3}' "$WG_CONF"
+}
+
+cmd_show() {
+    local file="${CLIENTS}/${1}.conf"
+    [[ -f $file ]] || die "no configuration stored for ${1}"
+    printf '\nConfiguration file: %s\n\n' "$file"
+    if command -v qrencode >/dev/null; then
+        qrencode -t ansiutf8 < "$file"
+    fi
+}
+
+case ${1-} in
+    add)    [[ $# -ge 2 ]] || usage; cmd_add "$2" "${3:-split}" ;;
+    remove) [[ $# -eq 2 ]] || usage; cmd_remove "$2" ;;
+    list)   cmd_list ;;
+    show)   [[ $# -eq 2 ]] || usage; cmd_show "$2" ;;
+    *) usage ;;
+esac

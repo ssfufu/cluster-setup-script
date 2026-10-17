@@ -1,0 +1,44 @@
+# Managed by cluster-setup
+# The "localdb" profile (enabled in .env) runs a bundled PostgreSQL.
+services:
+  tolgee:
+    image: tolgee/tolgee:${TOLGEE_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+    ports:
+      - "127.0.0.1:${HOST_PORT}:8080"
+    environment:
+      TOLGEE_FRONT_END_URL: https://${FQDN}
+      TOLGEE_AUTHENTICATION_ENABLED: "true"
+      TOLGEE_AUTHENTICATION_CREATE_INITIAL_USER: "true"
+      TOLGEE_AUTHENTICATION_INITIAL_USERNAME: ${TOLGEE_ADMIN_USER}
+      TOLGEE_AUTHENTICATION_INITIAL_PASSWORD: ${TOLGEE_ADMIN_PASSWORD}
+      TOLGEE_AUTHENTICATION_JWT_SECRET: ${TOLGEE_JWT_SECRET}
+      TOLGEE_POSTGRES_AUTOSTART_ENABLED: "false"
+      TOLGEE_TELEMETRY_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  db:
+    image: postgres:17-alpine
+    profiles: ["localdb"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

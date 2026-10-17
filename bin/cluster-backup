@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Encrypted, deduplicated backup of the host with restic.
+# Settings: /etc/cluster-setup/backup.env (written by ./main.sh backup)
+#
+# Containers are stopped during the snapshot so databases are consistent,
+# and are always restarted, even if the backup fails.
+set -Eeuo pipefail
+umask 077
+
+ENV_FILE=/etc/cluster-setup/backup.env
+[[ -r $ENV_FILE ]] || { echo "Missing ${ENV_FILE}; run ./main.sh backup first." >&2; exit 1; }
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+exec 9>/run/cluster-backup.lock
+flock -n 9 || { echo "Another backup is already running." >&2; exit 1; }
+
+log() { printf '%s %s\n' "$(date -Iseconds)" "$*"; }
+
+stopped_docker=()
+stopped_lxc=()
+restart_services() {
+    local ct
+    for ct in "${stopped_lxc[@]}"; do
+        lxc-start -n "$ct" || log "WARNING: could not restart container ${ct}"
+    done
+    if (( ${#stopped_docker[@]} )); then
+        docker start "${stopped_docker[@]}" >/dev/null || log "WARNING: some Docker containers did not restart"
+    fi
+    stopped_lxc=()
+    stopped_docker=()
+}
+trap restart_services EXIT
+
+if [[ ${BACKUP_STOP_SERVICES:-yes} == yes ]]; then
+    if command -v lxc-ls >/dev/null; then
+        mapfile -t stopped_lxc < <(lxc-ls -1 --running)
+        for ct in "${stopped_lxc[@]}"; do
+            log "Stopping container ${ct}"
+            lxc-stop -n "$ct" -t 60
+        done
+    fi
+    if command -v docker >/dev/null; then
+        mapfile -t stopped_docker < <(docker ps -q)
+        if (( ${#stopped_docker[@]} )); then
+            log "Stopping ${#stopped_docker[@]} Docker container(s)"
+            docker stop --time 60 "${stopped_docker[@]}" >/dev/null
+        fi
+    fi
+fi
+
+paths=()
+for p in /etc /root /home /opt/cluster-setup /var/lib/lxc /var/lib/docker/volumes /var/www; do
+    [[ -e $p ]] && paths+=("$p")
+done
+
+log "Starting backup of: ${paths[*]}"
+restic backup --tag cluster-setup --exclude-caches \
+    --exclude '/var/lib/lxc/*/rootfs/proc' \
+    --exclude '/var/lib/lxc/*/rootfs/sys' \
+    --exclude '/var/lib/lxc/*/rootfs/dev' \
+    --exclude '/var/lib/lxc/*/rootfs/tmp' \
+    --exclude '/var/lib/lxc/*/rootfs/var/cache/apt' \
+    --exclude '/home/*/.cache' \
+    "${paths[@]}"
+
+# Bring services back before the (slow) cleanup steps.
+restart_services
+
+log "Applying retention policy"
+restic forget --tag cluster-setup --host "$(hostname)" --prune \
+    --keep-daily "${KEEP_DAILY:-7}" --keep-weekly "${KEEP_WEEKLY:-4}" --keep-monthly "${KEEP_MONTHLY:-6}"
+
+if [[ $(date +%u) == 7 ]]; then
+    log "Weekly integrity check"
+    restic check --read-data-subset=5%
+fi
+log "Backup finished"
